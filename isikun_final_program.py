@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+
 import csv
 import io
 import math
@@ -187,8 +189,9 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "dev-secret-change-me")
 
 
+@dataclass
 class AppState:
-    calendar: Dict[str, Any] = {
+    calendar: Dict[str, Any] = field(default_factory=lambda: {
         "n_days": 10,
         "slots_per_day": 3,
         "slot_length_min": 180,
@@ -198,44 +201,41 @@ class AppState:
         "start_date": "2026-06-08",
         "end_date": "2026-06-21",
         "last_slot_forbidden_for_three_hour": False,
-    }
+    })
 
-    courses: Dict[str, Dict[str, Any]] = {}
-    conflicts: List[Tuple[str, str, int]] = []
-    group_constraints: List[Dict[str, Any]] = []
-    instructors: Dict[str, Dict[str, str]] = {}
-    instructor_unavailability: List[Dict[str, Any]] = []
+    courses: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    conflicts: List[Tuple[str, str, int]] = field(default_factory=list)
+    group_constraints: List[Dict[str, Any]] = field(default_factory=list)
+    instructors: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    instructor_unavailability: List[Dict[str, Any]] = field(default_factory=list)
 
-    slot_caps: Dict[Tuple[int, int], Dict[str, int]] = defaultdict(lambda: {"min": 0, "max": MAX_CAP})
-    seeds: List[Dict[str, Any]] = []
+    slot_caps: Dict[Tuple[int, int], Dict[str, int]] = field(
+        default_factory=lambda: defaultdict(lambda: {"min": 0, "max": MAX_CAP})
+    )
+    seeds: List[Dict[str, Any]] = field(default_factory=list)
 
-    preview: Dict[str, Tuple[int, int]] = {}
-    preview_unassigned: List[Tuple[str, str, List[Tuple[int, int]]]] = []
-    final: Dict[str, Tuple[int, int]] = {}
-    final_unassigned: List[Tuple[str, str, List[Tuple[int, int]]]] = []
-    last_diagnostics: List[str] = []
-    kontrol_results: Dict[str, Any] = {}
-    degistir_onerileri: List[Dict[str, Any]] = []
+    preview: Dict[str, Tuple[int, int]] = field(default_factory=dict)
+    preview_unassigned: List[Tuple[str, str, List[Tuple[int, int]]]] = field(default_factory=list)
+    final: Dict[str, Tuple[int, int]] = field(default_factory=dict)
+    final_unassigned: List[Tuple[str, str, List[Tuple[int, int]]]] = field(default_factory=list)
+    last_diagnostics: List[str] = field(default_factory=list)
+    kontrol_results: Dict[str, Any] = field(default_factory=dict)
+    degistir_onerileri: List[Dict[str, Any]] = field(default_factory=list)
+
+
+appstate = AppState()
 
 
 def reset_results() -> None:
-    AppState.preview = {}
-    AppState.preview_unassigned = []
-    AppState.final = {}
-    AppState.final_unassigned = []
+    appstate.preview.clear()
+    appstate.preview_unassigned.clear()
+    appstate.final.clear()
+    appstate.final_unassigned.clear()
 
 
 def reset_all_state() -> None:
-    AppState.courses = {}
-    AppState.conflicts = []
-    AppState.group_constraints = []
-    AppState.instructors = {}
-    AppState.instructor_unavailability = []
-    AppState.slot_caps = defaultdict(lambda: {"min": 0, "max": MAX_CAP})
-    AppState.seeds = []
-    AppState.last_diagnostics = []
-    AppState.kontrol_results = {}
-    AppState.degistir_onerileri = []
+    global appstate
+    appstate = AppState()
     reset_results()
 
 
@@ -248,7 +248,7 @@ def same_tab(tab: str) -> Any:
 # =========================
 
 def cal_obj() -> SimpleNamespace:
-    c = AppState.calendar
+    c = appstate.calendar
     return SimpleNamespace(
         n_days=to_int(c.get("n_days"), 9),
         slots_per_day=to_int(c.get("slots_per_day"), 4),
@@ -266,7 +266,7 @@ def course_obj(code: str, d: Dict[str, Any]) -> SimpleNamespace:
     return SimpleNamespace(
         code=code,
         name=str(d.get("name") or ""),
-        duration=to_int(d.get("duration"), to_int(AppState.calendar.get("slot_length_min"), 60)),
+        duration=to_int(d.get("duration"), to_int(appstate.calendar.get("slot_length_min"), 60)),
         size=to_int(d.get("size"), 0),
         preferred_days=list(d.get("preferred_days") or []),
         forbidden_days=list(d.get("forbidden_days") or []),
@@ -280,7 +280,7 @@ def course_obj(code: str, d: Dict[str, Any]) -> SimpleNamespace:
 
 def instructors_obj() -> Dict[str, SimpleNamespace]:
     out: Dict[str, SimpleNamespace] = {}
-    for iid, info in AppState.instructors.items():
+    for iid, info in appstate.instructors.items():
         out[iid] = SimpleNamespace(name=str(info.get("name") or ""), email=str(info.get("email") or ""))
     return out
 
@@ -288,24 +288,24 @@ def instructors_obj() -> Dict[str, SimpleNamespace]:
 def unavailability_obj() -> List[SimpleNamespace]:
     return [
         SimpleNamespace(instr=str(u.get("instr") or ""), day=to_int(u.get("day"), 0), slot=to_int(u.get("slot"), 0))
-        for u in AppState.instructor_unavailability
+        for u in appstate.instructor_unavailability
     ]
 
 
 def group_constraints_obj() -> List[SimpleNamespace]:
     return [
         SimpleNamespace(type=str(g.get("type") or ""), courses=list(g.get("courses") or []))
-        for g in AppState.group_constraints
+        for g in appstate.group_constraints
     ]
 
 
 def slot_caps_obj() -> Dict[Tuple[int, int], SimpleNamespace]:
     out: Dict[Tuple[int, int], SimpleNamespace] = {}
-    n = to_int(AppState.calendar.get("n_days"), 9)
-    spd = to_int(AppState.calendar.get("slots_per_day"), 4)
+    n = to_int(appstate.calendar.get("n_days"), 9)
+    spd = to_int(appstate.calendar.get("slots_per_day"), 4)
     for d in range(1, n + 1):
         for s in range(1, spd + 1):
-            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
+            cap = appstate.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
             mn = to_int(cap.get("min"), 0)
             mx = to_int(cap.get("max"), MAX_CAP)
             if mn > mx:
@@ -318,7 +318,7 @@ def seeds_obj() -> List[SimpleNamespace]:
     return [
         SimpleNamespace(course=norm_code(s.get("course")), day=to_int(s.get("day"), 0),
                        slot=to_int(s.get("slot"), 0), lock=to_bool(s.get("lock")))
-        for s in AppState.seeds
+        for s in appstate.seeds
     ]
 
 
@@ -354,9 +354,9 @@ def load_courses_excel(data: bytes) -> None:
         if key:
             colmap[idx] = key
 
-    n_days = to_int(AppState.calendar.get("n_days"), 9)
-    spd = to_int(AppState.calendar.get("slots_per_day"), 4)
-    slot_len = to_int(AppState.calendar.get("slot_length_min"), 60)
+    n_days = to_int(appstate.calendar.get("n_days"), 9)
+    spd = to_int(appstate.calendar.get("slots_per_day"), 4)
+    slot_len = to_int(appstate.calendar.get("slot_length_min"), 60)
 
     count = 0
     for row in ws.iter_rows(min_row=2, values_only=True):
@@ -388,7 +388,7 @@ def load_courses_excel(data: bytes) -> None:
 
         instructors = parse_ids(rowd.get("instructor_ids"))
 
-        AppState.courses[code] = {
+        appstate.courses[code] = {
             "code": code,
             "name": name,
             "duration": duration,
@@ -431,9 +431,9 @@ def load_conflicts_csv(data: bytes) -> None:
         if not a or not b or a == b:
             continue
         # Ignore conflicts that reference courses not present in the system
-        if a not in AppState.courses or b not in AppState.courses:
+        if a not in appstate.courses or b not in appstate.courses:
             continue
-        AppState.conflicts.append((a, b, max(1, w)))
+        appstate.conflicts.append((a, b, max(1, w)))
         added += 1
 
     reset_results()
@@ -459,9 +459,9 @@ def load_group_constraints_excel(data: bytes) -> None:
             if v is None or str(v).strip() == "":
                 continue
             codes = [norm_code(x) for x in re.split(r"[,\s;]+", str(v)) if norm_code(x)]
-            codes = [c for c in codes if c in AppState.courses]
+            codes = [c for c in codes if c in appstate.courses]
             if len(codes) >= 2:
-                AppState.group_constraints.append({"type": mapping[i], "courses": codes})
+                appstate.group_constraints.append({"type": mapping[i], "courses": codes})
                 added += 1
 
     reset_results()
@@ -474,20 +474,20 @@ def load_group_constraints_excel(data: bytes) -> None:
 
 def greedy_preview() -> None:
     reset_results()
-    n_days = to_int(AppState.calendar.get("n_days"), 9)
-    spd = to_int(AppState.calendar.get("slots_per_day"), 4)
+    n_days = to_int(appstate.calendar.get("n_days"), 9)
+    spd = to_int(appstate.calendar.get("slots_per_day"), 4)
 
     conf_pairs = set()
-    for a, b, _w in AppState.conflicts:
+    for a, b, _w in appstate.conflicts:
         a2, b2 = norm_code(a), norm_code(b)
         if a2 and b2:
             conf_pairs.add((a2, b2))
             conf_pairs.add((b2, a2))
 
-    for g in AppState.group_constraints:
+    for g in appstate.group_constraints:
         if str(g.get("type") or "") == "DifferentSlot":
             L = [norm_code(x) for x in (g.get("courses") or []) if norm_code(x)]
-            L = [x for x in L if x in AppState.courses]
+            L = [x for x in L if x in appstate.courses]
             for i in range(len(L)):
                 for j in range(i + 1, len(L)):
                     conf_pairs.add((L[i], L[j]))
@@ -496,7 +496,7 @@ def greedy_preview() -> None:
     slot_load: Dict[Tuple[int, int], int] = defaultdict(int)
 
     def fits(code: str, d: int, s: int) -> Tuple[bool, str]:
-        cd = AppState.courses.get(code, {})
+        cd = appstate.courses.get(code, {})
         size = to_int(cd.get("size"), 0)
 
         forb = [to_int(x, 0) for x in (cd.get("forbidden_days") or [])]
@@ -510,32 +510,32 @@ def greedy_preview() -> None:
 
         instrs = [str(x).strip() for x in (cd.get("instructors") or []) if str(x).strip()]
         if instrs:
-            for un in AppState.instructor_unavailability:
+            for un in appstate.instructor_unavailability:
                 if str(un.get("instr") or "") in instrs and to_int(un.get("day"), 0) == d and to_int(un.get("slot"), 0) == s:
                     return False, "Eğitmen"
 
-        cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
+        cap = appstate.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
         capmax = to_int(cap.get("max"), MAX_CAP)
         if capmax < MAX_CAP and slot_load[(d, s)] + size > capmax:
             return False, "Kapasite"
 
-        for other, (od, os) in AppState.preview.items():
+        for other, (od, os) in appstate.preview.items():
             other_base = base_code(other)
             if (od, os) == (d, s) and (code, other_base) in conf_pairs:
                 return False, "Çakışma/Grup"
         return True, ""
 
     order = sorted(
-        AppState.courses.keys(),
+        appstate.courses.keys(),
         key=lambda c: (
-            0 if (to_int(AppState.courses[c].get("fixed_day"), 0) > 0 and to_int(AppState.courses[c].get("fixed_slot"), 0) > 0) else 1,
-            -to_int(AppState.courses[c].get("size"), 0),
+            0 if (to_int(appstate.courses[c].get("fixed_day"), 0) > 0 and to_int(appstate.courses[c].get("fixed_slot"), 0) > 0) else 1,
+            -to_int(appstate.courses[c].get("size"), 0),
             c,
         ),
     )
 
     for code in order:
-        cd = AppState.courses[code]
+        cd = appstate.courses[code]
         size = to_int(cd.get("size"), 0)
         pref = [to_int(x, 0) for x in (cd.get("preferred_days") or [])]
         pref = [d for d in pref if 1 <= d <= n_days]
@@ -553,14 +553,14 @@ def greedy_preview() -> None:
 
         placed = False
         for (d, s) in candidates:
-            AppState.preview[code] = (d, s)
+            appstate.preview[code] = (d, s)
             slot_load[(d, s)] += size
             placed = True
             break
 
         if not placed:
             alts = candidates[:3]
-            AppState.preview_unassigned.append((code, reason, alts))
+            appstate.preview_unassigned.append((code, reason, alts))
 
 
 # =========================
@@ -570,7 +570,7 @@ def greedy_preview() -> None:
 def get_conflict_pairs() -> set[Tuple[str, str]]:
     """Sistemdeki çakışma çiftlerini normalize edilmiş şekilde döndürür."""
     pairs: set[Tuple[str, str]] = set()
-    for a, b, _w in AppState.conflicts:
+    for a, b, _w in appstate.conflicts:
         a2, b2 = norm_code(a), norm_code(b)
         if a2 and b2 and a2 != b2:
             pairs.add((a2, b2))
@@ -586,10 +586,10 @@ def get_group_pairs() -> Tuple[
     diff_day: set[Tuple[str, str]] = set()
     same_slot: set[Tuple[str, str]] = set()
     diff_slot: set[Tuple[str, str]] = set()
-    for g in AppState.group_constraints:
+    for g in appstate.group_constraints:
         gtype = str(g.get("type") or "")
         members = [norm_code(x) for x in (g.get("courses") or [])]
-        members = [m for m in members if m in AppState.courses]
+        members = [m for m in members if m in appstate.courses]
         if len(members) < 2:
             continue
         for i in range(len(members)):
@@ -845,36 +845,36 @@ def diagnose_all_issues() -> List[str]:
     """Tüm sistem verilerini tarar ve kullanıcıya gösterilecek uyarı/çelişki listesi döner.
     15+ farklı senaryo tespit edilir."""
     notes: List[str] = []
-    cal = AppState.calendar
+    cal = appstate.calendar
     n_days = to_int(cal.get("n_days"), 9)
     spd = to_int(cal.get("slots_per_day"), 4)
     slot_len = to_int(cal.get("slot_length_min"), 60)
     last_forbidden = to_bool(cal.get("last_slot_forbidden_for_three_hour"))
 
     _check_calendar_issues(notes, cal)
-    total_students = _check_course_issues(notes, AppState.courses, n_days, spd, last_forbidden, set(AppState.instructors.keys()))
-    _check_instructor_issues(notes, AppState.instructors, AppState.instructor_unavailability)
-    _check_seed_issues(notes, AppState.courses, AppState.seeds, n_days, spd)
-    _check_capacity_issues(notes, AppState.slot_caps, n_days, spd, AppState.courses, total_students)
+    total_students = _check_course_issues(notes, appstate.courses, n_days, spd, last_forbidden, set(appstate.instructors.keys()))
+    _check_instructor_issues(notes, appstate.instructors, appstate.instructor_unavailability)
+    _check_seed_issues(notes, appstate.courses, appstate.seeds, n_days, spd)
+    _check_capacity_issues(notes, appstate.slot_caps, n_days, spd, appstate.courses, total_students)
 
-    course_codes = set(AppState.courses.keys())
-    _check_conflict_data_issues(notes, AppState.conflicts, course_codes)
-    _check_group_data_issues(notes, AppState.group_constraints, course_codes)
-    _check_group_conflicts(notes, AppState.group_constraints, AppState.courses, spd)
+    course_codes = set(appstate.courses.keys())
+    _check_conflict_data_issues(notes, appstate.conflicts, course_codes)
+    _check_group_data_issues(notes, appstate.group_constraints, course_codes)
+    _check_group_conflicts(notes, appstate.group_constraints, appstate.courses, spd)
 
     return notes
 
 
 def analyze_assignment_issues(assign: Dict[str, Tuple[int, int]], slot_load: Dict[Tuple[int, int], int]) -> List[str]:
     issues: List[str] = []
-    n_days = to_int(AppState.calendar.get("n_days"), 9)
-    spd = to_int(AppState.calendar.get("slots_per_day"), 4)
+    n_days = to_int(appstate.calendar.get("n_days"), 9)
+    spd = to_int(appstate.calendar.get("slots_per_day"), 4)
 
     placed = {base_code(k): (to_int(v[0], 0), to_int(v[1], 0)) for k, v in assign.items() if "__extra__" not in k}
 
     # Individual course assignment checks
     for code, (d, s) in placed.items():
-        cd = AppState.courses.get(code, {})
+        cd = appstate.courses.get(code, {})
         if not cd:
             continue
         fd = to_int(cd.get("fixed_day"), 0)
@@ -912,24 +912,24 @@ def analyze_assignment_issues(assign: Dict[str, Tuple[int, int]], slot_load: Dic
             )
 
         for iid in instrs:
-            unavailable = [to_int(rec.get("slot"), 0) for rec in AppState.instructor_unavailability
+            unavailable = [to_int(rec.get("slot"), 0) for rec in appstate.instructor_unavailability
                            if str(rec.get("instr") or "").strip() == iid and to_int(rec.get("day"), 0) == d]
             if s in unavailable:
                 issues.append(f"{code}: Eğitmen {iid} için G{d}/S{s} uygun değil.")
 
     # Conflict / group violations
     conflict_pairs = set()
-    for a, b, _w in AppState.conflicts:
+    for a, b, _w in appstate.conflicts:
         a2, b2 = norm_code(a), norm_code(b)
         if a2 and b2:
             conflict_pairs.add((a2, b2))
             conflict_pairs.add((b2, a2))
 
     diffslot_pairs = set()
-    for g in AppState.group_constraints:
+    for g in appstate.group_constraints:
         if str(g.get("type") or "") == "DifferentSlot":
             L = [norm_code(x) for x in (g.get("courses") or []) if norm_code(x)]
-            L = [x for x in L if x in AppState.courses]
+            L = [x for x in L if x in appstate.courses]
             for i in range(len(L)):
                 for j in range(i + 1, len(L)):
                     diffslot_pairs.add((L[i], L[j]))
@@ -950,7 +950,7 @@ def analyze_assignment_issues(assign: Dict[str, Tuple[int, int]], slot_load: Dic
 
     # Slot capacity issues
     for (d, s), load in slot_load.items():
-        cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
+        cap = appstate.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
         capmin = to_int(cap.get("min"), 0)
         capmax = to_int(cap.get("max"), MAX_CAP)
         if capmin > capmax:
@@ -1014,7 +1014,7 @@ def cpsat_solve_relaxed(courses: List[str], n_days: int, spd: int, allowed: Dict
     # Active expr - simplified
     active_expr = {}
     for c in courses:
-        ms = to_int(AppState.courses[c].get("multi_slots"), 1)
+        ms = to_int(appstate.courses[c].get("multi_slots"), 1)
         for p in range(1, P + 1):
             terms_c = []
             for off in range(ms):
@@ -1059,16 +1059,16 @@ def cpsat_solve_relaxed(courses: List[str], n_days: int, spd: int, allowed: Dict
     expanded: Dict[str, Tuple[int, int]] = {}
     for c, (d, s) in assigned_map.items():
         expanded[c] = (d, s)
-        ms = to_int(AppState.courses[c].get("multi_slots"), 1)
+        ms = to_int(appstate.courses[c].get("multi_slots"), 1)
         if ms > 1:
             for off in range(1, ms):
                 expanded[f"{c}__extra__{off}"] = (d, s + off)
     
-    AppState.final = expanded
+    appstate.final = expanded
     
-    AppState.final_unassigned = []
+    appstate.final_unassigned = []
     for c in unassigned:
-        cd = AppState.courses.get(c, {})
+        cd = appstate.courses.get(c, {})
         alts: List[Tuple[int, int]] = []
         allowed_for_c = allowed.get(c, [])
         pref_days = [to_int(x, 0) for x in (cd.get("preferred_days") or []) if 1 <= to_int(x, 0) <= n_days]
@@ -1083,7 +1083,7 @@ def cpsat_solve_relaxed(courses: List[str], n_days: int, spd: int, allowed: Dict
                 d, s = period_to_day_slot(p, spd)
                 alts.append((d, s))
 
-        AppState.final_unassigned.append((c, reason, alts))
+        appstate.final_unassigned.append((c, reason, alts))
     
     msg = f"Çözüm tamamlandı. {len(assigned_map)}/{len(courses)} ders atandı."
     msg += " Tercih günleri hard constraint olarak uygulandı. Tercih dışına atama yapılmadı."
@@ -1096,15 +1096,15 @@ def cpsat_solve_relaxed(courses: List[str], n_days: int, spd: int, allowed: Dict
 
 def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
     reset_results()
-    AppState.last_diagnostics.append("Tercih günleri hard constraint olarak uygulanıyor.")
+    appstate.last_diagnostics.append("Tercih günleri hard constraint olarak uygulanıyor.")
     if not HAS_ORTOOLS:
         return False, "OR-Tools yüklü değil. pip install ortools"
 
-    n_days = to_int(AppState.calendar.get("n_days"), 9)
-    spd = to_int(AppState.calendar.get("slots_per_day"), 4)
+    n_days = to_int(appstate.calendar.get("n_days"), 9)
+    spd = to_int(appstate.calendar.get("slots_per_day"), 4)
     P = n_days * spd
 
-    courses = sorted(AppState.courses.keys())
+    courses = sorted(appstate.courses.keys())
     if not courses:
         return True, "Ders yok."
 
@@ -1139,7 +1139,7 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
 
     # Instructor unavailability lookup
     unav: Dict[Tuple[str, int], set[int]] = defaultdict(set)
-    for rec in AppState.instructor_unavailability:
+    for rec in appstate.instructor_unavailability:
         iid = str(rec.get("instr") or "").strip()
         d = to_int(rec.get("day"), 0)
         s = to_int(rec.get("slot"), 0)
@@ -1148,7 +1148,7 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
 
     allowed: Dict[str, List[int]] = {}
     for c in courses:
-        cd = AppState.courses[c]
+        cd = appstate.courses[c]
         ms = to_int(cd.get("multi_slots"), 1)
         forb = set(to_int(x, 0) for x in (cd.get("forbidden_days") or []))
         pref_days = [to_int(x, 0) for x in (cd.get("preferred_days") or []) if 1 <= to_int(x, 0) <= n_days]
@@ -1214,7 +1214,7 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
     # Hangi ders hangi periyotlarda AKTİF (yer kaplıyor) haritası
     active_expr = {}
     for c in courses:
-        ms = to_int(AppState.courses[c].get("multi_slots"), 1)
+        ms = to_int(appstate.courses[c].get("multi_slots"), 1)
         for p in range(1, P + 1):
             terms_c = []
             # Ders p periyodunda aktifse, (p - off) periyotlarından birinde başlamıştır.
@@ -1225,11 +1225,11 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
             active_expr[(c, p)] = LinearExpr.Sum(terms_c) if terms_c else LinearExpr.Constant(0)
 
     # 1. Kapasite (Hard Constraint) Güncellemesi
-    size_map = {c: to_int(AppState.courses[c].get("size"), 0) for c in courses}
+    size_map = {c: to_int(appstate.courses[c].get("size"), 0) for c in courses}
     
     # Seeds: build seed_map for later use
     seed_map: Dict[str, Tuple[int, int, bool]] = {}
-    for s in AppState.seeds:
+    for s in appstate.seeds:
         c = norm_code(s.get("course"))
         d = to_int(s.get("day"), 0)
         sl = to_int(s.get("slot"), 0)
@@ -1239,7 +1239,7 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
     for d in range(1, n_days + 1):
         for s in range(1, spd + 1):
             p = period_index(d, s, spd)
-            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
+            cap = appstate.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
             capmax = to_int(cap.get("max"), MAX_CAP)
             if capmax < MAX_CAP:
                 # Sadece başlayanlar değil, o an AKTİF olan tüm derslerin kapasitesi toplanır
@@ -1253,10 +1253,10 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
         model.AddBoolOr([un[a], un[b]]).OnlyEnforceIf(bb.Not())
         return bb
 
-    for g in AppState.group_constraints:
+    for g in appstate.group_constraints:
         gtype = str(g.get("type") or "")
         members = [norm_code(x) for x in (g.get("courses") or [])]
-        members = [m for m in members if m in AppState.courses]
+        members = [m for m in members if m in appstate.courses]
         if len(members) < 2:
             continue
         for i in range(len(members)):
@@ -1300,7 +1300,7 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
 
     # Öğrenci çakışmaları (Soft Conflicts)
     seen = set()
-    for a, b, w in AppState.conflicts:
+    for a, b, w in appstate.conflicts:
         a2, b2 = norm_code(a), norm_code(b)
         if not a2 or not b2 or a2 == b2 or a2 not in t or b2 not in t:
             continue
@@ -1335,7 +1335,7 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
         terms.append(w2 * 1000 * viol_assigned)
 
     for c in courses:
-        cd = AppState.courses[c]
+        cd = appstate.courses[c]
         fd = to_int(cd.get("fixed_day"), 0)
         fs = to_int(cd.get("fixed_slot"), 0)
         if fd == 0 and 1 <= fs <= spd:
@@ -1355,7 +1355,7 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
     for d in range(1, n_days + 1):
         for s in range(1, spd + 1):
             p = period_index(d, s, spd)
-            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
+            cap = appstate.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
             capmin = to_int(cap.get("min"), 0)
             if capmin <= 0:
                 continue
@@ -1389,13 +1389,13 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
     status = solver.Solve(model)
     
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        AppState.last_diagnostics.append("Çözüm bulunamadı. Tercih günleri ve diğer kısıtlar hard olarak uygulandı.")
+        appstate.last_diagnostics.append("Çözüm bulunamadı. Tercih günleri ve diğer kısıtlar hard olarak uygulandı.")
         # Hangi derslerin hiç uygun slotu yok?
         zero_allowed = [c for c in courses if not allowed.get(c)]
         if zero_allowed:
-            AppState.last_diagnostics.append(f"Hiç uygun slotu olmayan dersler ({len(zero_allowed)}): {', '.join(zero_allowed[:10])}")
-        AppState.last_diagnostics.extend(diagnose_all_issues())
-        n_diag = len(AppState.last_diagnostics)
+            appstate.last_diagnostics.append(f"Hiç uygun slotu olmayan dersler ({len(zero_allowed)}): {', '.join(zero_allowed[:10])}")
+        appstate.last_diagnostics.extend(diagnose_all_issues())
+        n_diag = len(appstate.last_diagnostics)
         return False, f"Çözüm bulunamadı. Kısıtlar nedeniyle yerleştirme mümkün değil. ({n_diag} adet teşhis notu üretildi. Ekrandaki Uyarılar sekmesini kontrol edin.)"
 
     assigned_map: Dict[str, Tuple[int, int]] = {}
@@ -1411,16 +1411,16 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
     expanded: Dict[str, Tuple[int, int]] = {}
     for c, (d, s) in assigned_map.items():
         expanded[c] = (d, s)
-        ms = to_int(AppState.courses[c].get("multi_slots"), 1)
+        ms = to_int(appstate.courses[c].get("multi_slots"), 1)
         if ms > 1:
             for off in range(1, ms):
                 expanded[f"{c}__extra__{off}"] = (d, s + off)
 
-    AppState.final = expanded
+    appstate.final = expanded
 
-    AppState.final_unassigned = []
+    appstate.final_unassigned = []
     for c in unassigned:
-        cd = AppState.courses.get(c, {})
+        cd = appstate.courses.get(c, {})
         alts: List[Tuple[int, int]] = []
         reason = "Bilinmeyen neden"
         
@@ -1454,7 +1454,7 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
                 d, s = period_to_day_slot(p, spd)
                 alts.append((d, s))
         
-        AppState.final_unassigned.append((c, reason, alts))
+        appstate.final_unassigned.append((c, reason, alts))
 
     return True, f"Çözüm tamamlandı. {len(assigned_map)}/{len(courses)} ders yerleşti."
 
@@ -1467,7 +1467,7 @@ def build_excel() -> bytes:
     if not HAS_PANDAS:
         raise RuntimeError("pandas gerekli: pip install pandas")
 
-    assign = AppState.final or AppState.preview
+    assign = appstate.final or appstate.preview
     if not assign:
         raise RuntimeError("Takvim yok.")
 
@@ -1491,7 +1491,7 @@ def build_excel() -> bytes:
         starts_ends = [day_slot_times(ss, day_start, slot_len) for _, ss in slots]
         st = min(starts_ends, key=lambda x: (x[0].hour, x[0].minute))[0]
         en = max(starts_ends, key=lambda x: (x[1].hour, x[1].minute))[1]
-        cd = AppState.courses.get(code, {})
+        cd = appstate.courses.get(code, {})
         rows.append({
             "Ders Kodu": code,
             "Ders Adı": str(cd.get("name") or ""),
@@ -1511,7 +1511,7 @@ def build_excel() -> bytes:
 
 
 def build_ics() -> bytes:
-    assign = AppState.final or AppState.preview
+    assign = appstate.final or appstate.preview
     if not assign:
         raise RuntimeError("Takvim yok.")
     cal = cal_obj()
@@ -1545,7 +1545,7 @@ def build_ics() -> bytes:
         dtstart = datetime.combine(exam_date, st)
         dtend = datetime.combine(exam_date, en)
 
-        cd = AppState.courses.get(code, {})
+        cd = appstate.courses.get(code, {})
         summary = f"{code} {cd.get('name','')}".strip()
         desc = "Slots: " + ", ".join([f"G{d}/S{s}" for d, s in slots])
 
@@ -1569,20 +1569,20 @@ def build_ics() -> bytes:
 # =========================
 
 def run_kontrol_analizi() -> Dict[str, Any]:
-    AppState.kontrol_results = {}
-    AppState.degistir_onerileri = []
+    appstate.kontrol_results = {}
+    appstate.degistir_onerileri = []
 
-    assign = AppState.final or AppState.preview
+    assign = appstate.final or appstate.preview
     if not assign:
         return {}
 
-    n_days = to_int(AppState.calendar.get("n_days"), 9)
-    spd = to_int(AppState.calendar.get("slots_per_day"), 4)
+    n_days = to_int(appstate.calendar.get("n_days"), 9)
+    spd = to_int(appstate.calendar.get("slots_per_day"), 4)
 
     placed = {base_code(k): (to_int(v[0], 0), to_int(v[1], 0)) for k, v in assign.items() if "__extra__" not in k}
 
     conflict_pairs: set[Tuple[str, str]] = set()
-    for a, b, _w in AppState.conflicts:
+    for a, b, _w in appstate.conflicts:
         a2, b2 = norm_code(a), norm_code(b)
         if a2 and b2:
             conflict_pairs.add((a2, b2))
@@ -1590,10 +1590,10 @@ def run_kontrol_analizi() -> Dict[str, Any]:
 
     diffday_pairs: set[Tuple[str, str]] = set()
     diffslot_pairs: set[Tuple[str, str]] = set()
-    for g in AppState.group_constraints:
+    for g in appstate.group_constraints:
         gtype = str(g.get("type") or "")
         members = [norm_code(x) for x in (g.get("courses") or []) if norm_code(x)]
-        members = [m for m in members if m in AppState.courses]
+        members = [m for m in members if m in appstate.courses]
         if len(members) < 2:
             continue
         for i in range(len(members)):
@@ -1640,7 +1640,7 @@ def run_kontrol_analizi() -> Dict[str, Any]:
                 seen_diffslot.add(key)
                 diffslot_ihlal.append({"ders1": a, "ders2": b, "gun": placed[a][0], "slot": placed[a][1]})
 
-    eksik_dersler = [c for c in AppState.courses if c not in placed]
+    eksik_dersler = [c for c in appstate.courses if c not in placed]
 
     degisecek_set: set[str] = set()
     for ih in cakisma_ihlal + diffday_ihlal + diffslot_ihlal:
@@ -1708,7 +1708,7 @@ def run_kontrol_analizi() -> Dict[str, Any]:
 
     # --- B) Yerlesemeyen dersler icin de oneri uret ---
     for code in eksik_dersler:
-        cd = AppState.courses.get(code, {})
+        cd = appstate.courses.get(code, {})
         fd = to_int(cd.get("fixed_day"), 0)
         fs = to_int(cd.get("fixed_slot"), 0)
         forb = set(to_int(x, 0) for x in (cd.get("forbidden_days") or []))
@@ -1760,15 +1760,15 @@ def run_kontrol_analizi() -> Dict[str, Any]:
                 "neden": "Yerlesemeyen ders - hic uygun slot yok",
             })
 
-    AppState.kontrol_results = {
+    appstate.kontrol_results = {
         "cakisma_ihlal": cakisma_ihlal,
         "diffday_ihlal": diffday_ihlal,
         "diffslot_ihlal": diffslot_ihlal,
         "eksik_dersler": eksik_dersler,
         "degisecek_dersler": degisecek_dersler,
     }
-    AppState.degistir_onerileri = oneriler
-    return AppState.kontrol_results
+    appstate.degistir_onerileri = oneriler
+    return appstate.kontrol_results
 
 
 # =========================
@@ -1787,7 +1787,7 @@ def index():
         except Exception:
             edit_conflict_idx = None
 
-    assign = AppState.final or AppState.preview
+    assign = appstate.final or appstate.preview
 
     slot_load: Dict[Tuple[int, int], int] = defaultdict(int)
     explicit_extra_bases = {base_code(code) for code in assign.keys() if "__extra__" in code}
@@ -1797,10 +1797,10 @@ def index():
         if d_i <= 0 or s_i <= 0:
             continue
         base = base_code(code)
-        size = to_int(AppState.courses.get(base, {}).get("size"), 0)
+        size = to_int(appstate.courses.get(base, {}).get("size"), 0)
         slot_load[(d_i, s_i)] += size
         if "__extra__" not in code:
-            ms = to_int(AppState.courses.get(base, {}).get("multi_slots"), 1)
+            ms = to_int(appstate.courses.get(base, {}).get("multi_slots"), 1)
             if ms > 1 and base not in explicit_extra_bases:
                 for off in range(1, ms):
                     slot_load[(d_i, s_i + off)] += size
@@ -1808,7 +1808,7 @@ def index():
     def heat_cell(d: int, s: int) -> Tuple[str, int, int]:
         d = to_int(d, 0)
         s = to_int(s, 0)
-        cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
+        cap = appstate.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
         capmax = to_int(cap.get("max"), MAX_CAP)
         load = to_int(slot_load.get((d, s), 0), 0)
         denom = capmax if capmax < MAX_CAP else max(1, max(slot_load.values(), default=1))
@@ -1821,7 +1821,7 @@ def index():
         return time_to_hhmm(st), time_to_hhmm(en)
 
     check_fixed_ok = True
-    for c, cd in AppState.courses.items():
+    for c, cd in appstate.courses.items():
         fd = to_int(cd.get("fixed_day"), 0)
         fs = to_int(cd.get("fixed_slot"), 0)
         if fd > 0 and fs > 0 and c in assign:
@@ -1831,7 +1831,7 @@ def index():
 
     check_caps_ok = True
     for (d, s), load in slot_load.items():
-        cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
+        cap = appstate.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
         capmin = to_int(cap.get("min"), 0)
         capmax = to_int(cap.get("max"), MAX_CAP)
         if capmin > capmax:
@@ -1844,17 +1844,17 @@ def index():
     placed = {base_code(k): (to_int(v[0], 0), to_int(v[1], 0)) for k, v in assign.items() if "__extra__" not in k}
 
     diffslot_pairs = set()
-    for g in AppState.group_constraints:
+    for g in appstate.group_constraints:
         if str(g.get("type") or "") == "DifferentSlot":
             L = [norm_code(x) for x in (g.get("courses") or []) if norm_code(x)]
-            L = [x for x in L if x in AppState.courses]
+            L = [x for x in L if x in appstate.courses]
             for i in range(len(L)):
                 for j in range(i + 1, len(L)):
                     diffslot_pairs.add((L[i], L[j]))
                     diffslot_pairs.add((L[j], L[i]))
 
     conf_pairs = set()
-    for a, b, _w in AppState.conflicts:
+    for a, b, _w in appstate.conflicts:
         a2, b2 = norm_code(a), norm_code(b)
         if a2 and b2:
             conf_pairs.add((a2, b2))
@@ -1866,28 +1866,28 @@ def index():
             check_groups_ok = False
             break
 
-    courses_wrapped: Dict[str, SimpleNamespace] = {code: course_obj(code, cd) for code, cd in AppState.courses.items()}
+    courses_wrapped: Dict[str, SimpleNamespace] = {code: course_obj(code, cd) for code, cd in appstate.courses.items()}
     edit_data = courses_wrapped.get(edit_course_code) if edit_course_code else None
 
-    diagnostics = diagnose_all_issues() + list(AppState.last_diagnostics)
+    diagnostics = diagnose_all_issues() + list(appstate.last_diagnostics)
     assignment_issues = analyze_assignment_issues(assign, slot_load)
-    solve_notes = list(AppState.last_diagnostics)
+    solve_notes = list(appstate.last_diagnostics)
 
     # Atanamayan derslerin çakışma yaptığı dersleri bul
     conflict_pairs: Dict[str, set] = defaultdict(set)
-    for a, b, _w in AppState.conflicts:
+    for a, b, _w in appstate.conflicts:
         a2, b2 = norm_code(a), norm_code(b)
         if a2 and b2:
             conflict_pairs[a2].add(b2)
             conflict_pairs[b2].add(a2)
 
     preview_unassigned_conflicts: Dict[str, List[str]] = {}
-    for code, reason, alts in AppState.preview_unassigned:
+    for code, reason, alts in appstate.preview_unassigned:
         conflicting = sorted(conflict_pairs.get(norm_code(code), set()))
         preview_unassigned_conflicts[code] = conflicting
 
     final_unassigned_conflicts: Dict[str, List[str]] = {}
-    for code, reason, alts in AppState.final_unassigned:
+    for code, reason, alts in appstate.final_unassigned:
         conflicting = sorted(conflict_pairs.get(norm_code(code), set()))
         final_unassigned_conflicts[code] = conflicting
 
@@ -1895,17 +1895,17 @@ def index():
         "index.html",
         cal=cal,
         courses=courses_wrapped,
-        conflicts=AppState.conflicts,
+        conflicts=appstate.conflicts,
         group_constraints=group_constraints_obj(),
         instructors=instructors_obj(),
         instructor_unavailability=unavailability_obj(),
         slot_caps=slot_caps_obj(),
         seeds=seeds_obj(),
-        preview=AppState.preview,
-        preview_unassigned=AppState.preview_unassigned,
+        preview=appstate.preview,
+        preview_unassigned=appstate.preview_unassigned,
         preview_unassigned_conflicts=preview_unassigned_conflicts,
-        final=AppState.final,
-        final_unassigned=AppState.final_unassigned,
+        final=appstate.final,
+        final_unassigned=appstate.final_unassigned,
         final_unassigned_conflicts=final_unassigned_conflicts,
         has_ortools=HAS_ORTOOLS,
         heat_cell=heat_cell,
@@ -1920,14 +1920,14 @@ def index():
         diagnostics=diagnostics,
         assignment_issues=assignment_issues,
         solve_notes=solve_notes,
-        kontrol_results=AppState.kontrol_results,
-        degistir_onerileri=AppState.degistir_onerileri,
+        kontrol_results=appstate.kontrol_results,
+        degistir_onerileri=appstate.degistir_onerileri,
     )
 
 
 @app.route("/save_calendar", methods=["POST"])
 def save_calendar():
-    c = AppState.calendar
+    c = appstate.calendar
     c["n_days"] = clamp_int(request.form.get("n_days"), 1, 365) or to_int(c.get("n_days"), 9)
     c["slots_per_day"] = clamp_int(request.form.get("slots_per_day"), 1, 24) or to_int(c.get("slots_per_day"), 4)
     c["slot_length_min"] = clamp_int(request.form.get("slot_length_min"), 15, 600) or to_int(c.get("slot_length_min"), 60)
@@ -1942,8 +1942,8 @@ def save_calendar():
     spd = to_int(c["slots_per_day"], 4)
     for d in range(1, n + 1):
         for s in range(1, spd + 1):
-            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
-            AppState.slot_caps[(d, s)] = {"min": to_int(cap.get("min"), 0), "max": to_int(cap.get("max"), MAX_CAP)}
+            cap = appstate.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
+            appstate.slot_caps[(d, s)] = {"min": to_int(cap.get("min"), 0), "max": to_int(cap.get("max"), MAX_CAP)}
 
     reset_results()
     flash("Takvim ayarları kaydedildi.", "success")
@@ -1977,9 +1977,9 @@ def add_course():
         flash("Ders kodu zorunlu.", "danger")
         return same_tab(request.args.get("tab", "courses"))
 
-    n_days = to_int(AppState.calendar.get("n_days"), 9)
-    spd = to_int(AppState.calendar.get("slots_per_day"), 4)
-    slot_len = to_int(AppState.calendar.get("slot_length_min"), 60)
+    n_days = to_int(appstate.calendar.get("n_days"), 9)
+    spd = to_int(appstate.calendar.get("slots_per_day"), 4)
+    slot_len = to_int(appstate.calendar.get("slot_length_min"), 60)
 
     name = str(request.form.get("name") or "").strip()
     duration = to_int(request.form.get("duration"), slot_len)
@@ -2000,7 +2000,7 @@ def add_course():
 
     instructors = parse_ids(request.form.get("instructor_ids"))
 
-    AppState.courses[code] = {
+    appstate.courses[code] = {
         "code": code,
         "name": name,
         "duration": duration,
@@ -2021,15 +2021,15 @@ def add_course():
 @app.route("/update_course", methods=["POST"])
 def update_course():
     code = norm_code(request.form.get("code"))
-    if not code or code not in AppState.courses:
+    if not code or code not in appstate.courses:
         flash("Ders bulunamadı.", "danger")
         return same_tab(request.args.get("tab", "courses"))
 
-    n_days = to_int(AppState.calendar.get("n_days"), 9)
-    spd = to_int(AppState.calendar.get("slots_per_day"), 4)
-    slot_len = to_int(AppState.calendar.get("slot_length_min"), 60)
+    n_days = to_int(appstate.calendar.get("n_days"), 9)
+    spd = to_int(appstate.calendar.get("slots_per_day"), 4)
+    slot_len = to_int(appstate.calendar.get("slot_length_min"), 60)
 
-    cd = AppState.courses[code]
+    cd = appstate.courses[code]
     cd["name"] = str(request.form.get("name") or "").strip()
     cd["duration"] = to_int(request.form.get("duration"), slot_len)
     cd["size"] = to_int(request.form.get("size"), 0)
@@ -2056,8 +2056,8 @@ def update_course():
 @app.route("/del_course")
 def del_course():
     code = norm_code(request.args.get("code"))
-    if code in AppState.courses:
-        del AppState.courses[code]
+    if code in appstate.courses:
+        del appstate.courses[code]
         reset_results()
         flash("Ders silindi.", "warning")
     return same_tab(request.args.get("tab", "courses"))
@@ -2085,10 +2085,10 @@ def add_conflict():
         flash("Çakışma için iki farklı ders giriniz.", "danger")
         return same_tab(request.args.get("tab", "conflicts"))
     # Only add conflicts when both courses exist in the system
-    if a not in AppState.courses or b not in AppState.courses:
+    if a not in appstate.courses or b not in appstate.courses:
         flash("Çakışma eklenmedi: Bir veya iki ders sistemde yok.", "warning")
         return same_tab(request.args.get("tab", "conflicts"))
-    AppState.conflicts.append((a, b, max(1, w)))
+    appstate.conflicts.append((a, b, max(1, w)))
     reset_results()
     flash("Çakışma eklendi.", "success")
     return same_tab(request.args.get("tab", "conflicts"))
@@ -2097,7 +2097,7 @@ def add_conflict():
 @app.route("/update_conflict", methods=["POST"])
 def update_conflict():
     idx = clamp_int(request.form.get("idx"), 0, MAX_CAP)
-    if idx is None or idx < 0 or idx >= len(AppState.conflicts):
+    if idx is None or idx < 0 or idx >= len(appstate.conflicts):
         flash("Çakışma bulunamadı.", "danger")
         return same_tab(request.args.get("tab", "conflicts"))
     a = norm_code(request.form.get("c1"))
@@ -2106,7 +2106,7 @@ def update_conflict():
     if not a or not b or a == b:
         flash("Geçersiz çakışma.", "danger")
         return same_tab(request.args.get("tab", "conflicts"))
-    AppState.conflicts[idx] = (a, b, max(1, w))
+    appstate.conflicts[idx] = (a, b, max(1, w))
     reset_results()
     flash("Çakışma güncellendi.", "success")
     return same_tab(request.args.get("tab", "conflicts"))
@@ -2126,9 +2126,9 @@ def del_conflict():
     w2 = to_int(w, None) if w is not None else None  # type: ignore[arg-type]
 
     removed = False
-    for i, (aa, bb, ww) in enumerate(list(AppState.conflicts)):
+    for i, (aa, bb, ww) in enumerate(list(appstate.conflicts)):
         if aa == a2 and bb == b2 and (w2 is None or ww == w2):
-            AppState.conflicts.pop(i)
+            appstate.conflicts.pop(i)
             removed = True
             break
     if removed:
@@ -2164,11 +2164,11 @@ def add_group_constraint():
     gtype = str(request.form.get("type") or "").strip()
     courses_raw = request.form.get("courses") or ""
     members = [norm_code(x) for x in re.split(r"[,\s;]+", courses_raw) if norm_code(x)]
-    members = [m for m in members if m in AppState.courses]
+    members = [m for m in members if m in appstate.courses]
     if gtype not in ("SameDay", "DifferentDay", "SameSlot", "DifferentSlot") or len(members) < 2:
         flash("Grup türü ve en az 2 ders giriniz.", "danger")
         return same_tab(request.args.get("tab", "conflicts"))
-    AppState.group_constraints.append({"type": gtype, "courses": members})
+    appstate.group_constraints.append({"type": gtype, "courses": members})
     reset_results()
     flash("Grup kısıtı eklendi.", "success")
     return same_tab(request.args.get("tab", "conflicts"))
@@ -2177,8 +2177,8 @@ def add_group_constraint():
 @app.route("/del_group_constraint")
 def del_group_constraint():
     idx = clamp_int(request.args.get("idx"), 0, MAX_CAP)
-    if idx is not None and 0 <= idx < len(AppState.group_constraints):
-        AppState.group_constraints.pop(idx)
+    if idx is not None and 0 <= idx < len(appstate.group_constraints):
+        appstate.group_constraints.pop(idx)
         reset_results()
         flash("Grup kısıtı silindi.", "warning")
     return same_tab(request.args.get("tab", "conflicts"))
@@ -2192,7 +2192,7 @@ def add_instructor():
     if not iid:
         flash("Eğitmen ID gerekli.", "danger")
         return same_tab(request.args.get("tab", "instructors"))
-    AppState.instructors[iid] = {"name": name, "email": email}
+    appstate.instructors[iid] = {"name": name, "email": email}
     flash("Eğitmen eklendi.", "success")
     return same_tab(request.args.get("tab", "instructors"))
 
@@ -2200,8 +2200,8 @@ def add_instructor():
 @app.route("/del_instructor")
 def del_instructor():
     iid = str(request.args.get("instr_id") or "").strip()
-    if iid in AppState.instructors:
-        del AppState.instructors[iid]
+    if iid in appstate.instructors:
+        del appstate.instructors[iid]
         flash("Eğitmen silindi.", "warning")
     return same_tab(request.args.get("tab", "instructors"))
 
@@ -2214,7 +2214,7 @@ def add_unavailability():
     if not iid or not day or not slot:
         flash("Uygun olmama için ID/gün/slot giriniz.", "danger")
     else:
-        AppState.instructor_unavailability.append({"instr": iid, "day": to_int(day, 0), "slot": to_int(slot, 0)})
+        appstate.instructor_unavailability.append({"instr": iid, "day": to_int(day, 0), "slot": to_int(slot, 0)})
         reset_results()
         flash("Uygun olmama eklendi.", "success")
     return same_tab(request.args.get("tab", "instructors"))
@@ -2223,8 +2223,8 @@ def add_unavailability():
 @app.route("/del_unavailability")
 def del_unavailability():
     idx = clamp_int(request.args.get("idx"), 0, MAX_CAP)
-    if idx is not None and 0 <= idx < len(AppState.instructor_unavailability):
-        AppState.instructor_unavailability.pop(idx)
+    if idx is not None and 0 <= idx < len(appstate.instructor_unavailability):
+        appstate.instructor_unavailability.pop(idx)
         reset_results()
         flash("Kayıt silindi.", "warning")
     return same_tab(request.args.get("tab", "instructors"))
@@ -2234,22 +2234,22 @@ def del_unavailability():
 def bulk_set_caps():
     max_all = request.form.get("max_all")
     min_all = request.form.get("min_all")
-    n = to_int(AppState.calendar.get("n_days"), 9)
-    spd = to_int(AppState.calendar.get("slots_per_day"), 4)
+    n = to_int(appstate.calendar.get("n_days"), 9)
+    spd = to_int(appstate.calendar.get("slots_per_day"), 4)
 
     mm = to_opt_int(min_all)
     mx = to_opt_int(max_all)
 
     for d in range(1, n + 1):
         for s in range(1, spd + 1):
-            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
+            cap = appstate.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
             if mm is not None:
                 cap["min"] = to_int(mm, 0)
             if mx is not None:
                 cap["max"] = to_int(mx, MAX_CAP)
             if to_int(cap["min"], 0) > to_int(cap["max"], MAX_CAP):
                 cap["min"], cap["max"] = cap["max"], cap["min"]
-            AppState.slot_caps[(d, s)] = {"min": to_int(cap["min"], 0), "max": to_int(cap["max"], MAX_CAP)}
+            appstate.slot_caps[(d, s)] = {"min": to_int(cap["min"], 0), "max": to_int(cap["max"], MAX_CAP)}
 
     reset_results()
     flash("Toplu kapasite uygulandı.", "success")
@@ -2258,8 +2258,8 @@ def bulk_set_caps():
 
 @app.route("/save_caps", methods=["POST"])
 def save_caps():
-    n = to_int(AppState.calendar.get("n_days"), 9)
-    spd = to_int(AppState.calendar.get("slots_per_day"), 4)
+    n = to_int(appstate.calendar.get("n_days"), 9)
+    spd = to_int(appstate.calendar.get("slots_per_day"), 4)
     for d in range(1, n + 1):
         for s in range(1, spd + 1):
             mn = to_opt_int(request.form.get(f"min_{d}_{s}"))
@@ -2269,7 +2269,7 @@ def save_caps():
             mx_i = to_int(mx, MAX_CAP)
             if mn_i > mx_i:
                 mn_i, mx_i = mx_i, mn_i
-            AppState.slot_caps[(d, s)] = {"min": mn_i, "max": mx_i}
+            appstate.slot_caps[(d, s)] = {"min": mn_i, "max": mx_i}
     reset_results()
     flash("Kapasiteler kaydedildi.", "success")
     return same_tab(request.args.get("tab", "slotcaps"))
@@ -2284,7 +2284,7 @@ def add_seed():
     if not c or not d or not s:
         flash("Tohum için ders/gün/slot giriniz.", "danger")
     else:
-        AppState.seeds.append({"course": c, "day": to_int(d, 0), "slot": to_int(s, 0), "lock": lock})
+        appstate.seeds.append({"course": c, "day": to_int(d, 0), "slot": to_int(s, 0), "lock": lock})
         reset_results()
         flash("Tohum eklendi.", "success")
     return same_tab(request.args.get("tab", "seeds"))
@@ -2293,8 +2293,8 @@ def add_seed():
 @app.route("/del_seed")
 def del_seed():
     idx = clamp_int(request.args.get("idx"), 0, MAX_CAP)
-    if idx is not None and 0 <= idx < len(AppState.seeds):
-        AppState.seeds.pop(idx)
+    if idx is not None and 0 <= idx < len(appstate.seeds):
+        appstate.seeds.pop(idx)
         reset_results()
         flash("Tohum silindi.", "warning")
     return same_tab(request.args.get("tab", "seeds"))
@@ -2346,18 +2346,18 @@ def apply_changes():
         if new_day <= 0 or new_slot <= 0:
             # Yerlesmeyen ders icin YOK onerisi secildiyse atla
             continue
-        if code not in AppState.final and code not in AppState.preview:
+        if code not in appstate.final and code not in appstate.preview:
             continue
-        if code in AppState.final:
-            AppState.final[code] = (new_day, new_slot)
-            ms = to_int(AppState.courses.get(code, {}).get("multi_slots"), 1)
+        if code in appstate.final:
+            appstate.final[code] = (new_day, new_slot)
+            ms = to_int(appstate.courses.get(code, {}).get("multi_slots"), 1)
             if ms > 1:
                 for off in range(1, ms):
                     extra_key = f"{code}__extra__{off}"
-                    if extra_key in AppState.final:
-                        AppState.final[extra_key] = (new_day, new_slot + off)
-        if code in AppState.preview:
-            AppState.preview[code] = (new_day, new_slot)
+                    if extra_key in appstate.final:
+                        appstate.final[extra_key] = (new_day, new_slot + off)
+        if code in appstate.preview:
+            appstate.preview[code] = (new_day, new_slot)
         updated += 1
 
     if updated:
@@ -2401,10 +2401,10 @@ def save_ics_post():
 reset_all_state()
 
 if __name__ == "__main__":
-    n = to_int(AppState.calendar.get("n_days"), 9)
-    spd = to_int(AppState.calendar.get("slots_per_day"), 4)
+    n = to_int(appstate.calendar.get("n_days"), 9)
+    spd = to_int(appstate.calendar.get("slots_per_day"), 4)
     for d in range(1, n + 1):
         for s in range(1, spd + 1):
-            _ = AppState.slot_caps[(d, s)]
+            _ = appstate.slot_caps[(d, s)]
     app.run(host="127.0.0.1", port=5000, debug=False)
 
