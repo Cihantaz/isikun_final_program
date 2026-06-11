@@ -148,4 +148,17 @@ Her anahtar ders kodu, değer `[gün, slot]` listesidir.
 
 ---
 
+## 5. Son Değişiklikler (2026-06-11)
+
+| Değişiklik | Açıklama |
+|------------|----------|
+| **AppState Refactor** | Global state `@dataclass` + `field(default_factory=...)` ile yeniden yapılandırıldı. Thread-safety iyileştirildi. |
+| **Feasibility Doctor** | `diagnose_all_issues()` 7 alt fonksiyona bölündü; okunabilirlik ve bakım kolaylığı arttı. |
+| **Cache Helper'ları** | `get_conflict_pairs()` ve `get_group_pairs()` eklendi; çakışma verisi her fonksiyonda yeniden oluşturulmuyor. |
+| **MAX_CAP Sabiti** | `10**9` magic number yerine `MAX_CAP = 10 ** 9` sabiti tanımlandı. |
+| **Greedy Optimize** | `greedy_preview()` içindeki gereksiz ikinci `fits()` döngüsü kaldırıldı. |
+| **Bugfix'ler** | `base_code()` lowercase replace bug düzeltildi, `to_int()` sadeleştirildi. |
+
+---
+
 *Son güncelleme: 2026-06-11*

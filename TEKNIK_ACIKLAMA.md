@@ -39,8 +39,8 @@ final takvim new/
 - **pandas** — Veri çerçevesi işlemleri (isteğe bağlı ama önerilir)
 - **OR-Tools (cp_model)** — CP-SAT optimizasyon motoru
 
-### 2.2 State Yönetimi (`AppState`)
-Tüm veriler statik bir `AppState` sınıfında tutulur (session yok, tek kullanıcılı çalışma varsayılır):
+### 2.2 State Yönetimi (`appstate`)
+Tüm veriler global bir `appstate` instance'ında tutulur. `AppState` `@dataclass` olarak tanımlanmıştır ve tüm alanlar `field(default_factory=...)` ile başlatılır. Bu, class-level mutable defaults sorununu çözerek thread-safety'yi iyileştirir (session yok, tek kullanıcılı çalışma varsayılır):
 
 | Alan | Tip | Açıklama |
 |------|-----|----------|
@@ -113,14 +113,19 @@ Tüm veriler statik bir `AppState` sınıfında tutulur (session yok, tek kullan
 `DifferentSlot` önemli not: OR-Tools’ta `t[a] != t[b]` farklı periyot demektir; farklı gün otomatik olarak farklı periyottur, dolayısıyla farklı gündeki aynı saatli slotlar **ihlal sayılmaz**. Bu, kullanıcının istediği "farklı slot sadece aynı günde anlamlı" kuralına uygundur.
 
 ### 2.6 Feasibility Doctor (`diagnose_all_issues`)
-Yerleşim öncesi / sonrası 7 kategoride 15+ senaryo tespit eder:
-1. Takvim fiziksel uygunluk (slot süreleri gün içine sığmıyor mu?)
-2. Ders seviyesi (multi_slots taşma, sabit vs engelli gün çelişkisi, kayıtsız eğitmen ID)
-3. Eğitmen uyarıları (kayıtsız ID)
-4. Seed uyarıları (sabit çelişki, engelli gün, takvim dışı)
-5. Kapasite uyarıları (toplam talep > arz, min kapasite > öğrenci sayısı)
-6. Çakışma / grup veri uyarıları (kayıp ders kodu, tekrar)
-7. Grup çelişkileri (SameDay + DifferentDay aynı anda, sabit slot vs grup kısıtı)
+Yerleşim öncesi / sonrası 7 kategoride 15+ senaryo tespit eder. Monolitik yapıdan çıkarılarak 7 alt fonksiyona bölünmüştür:
+
+| Alt Fonksiyon | Sorumluluk |
+|---------------|------------|
+| `_check_calendar_issues` | Slot süreleri gün içine sığmıyor mu? |
+| `_check_course_issues` | multi_slots taşma, sabit vs engelli gün çelişkisi, kayıtsız eğitmen ID |
+| `_check_instructor_issues` | Kayıtsız eğitmen ID'leri |
+| `_check_seed_issues` | Sabit çelişki, engelli gün, takvim dışı |
+| `_check_capacity_issues` | Toplam talep > arz, min kapasite > öğrenci sayısı |
+| `_check_conflict_data_issues` | Kayıp ders kodu, tekrar |
+| `_check_group_conflicts` | SameDay + DifferentDay aynı anda, sabit slot vs grup kısıtı |
+
+Ayrıca `get_conflict_pairs()` ve `get_group_pairs()` helper'ları ile çakışma/grup verileri her fonksiyonda yeniden oluşturulmaz.
 
 ---
 
