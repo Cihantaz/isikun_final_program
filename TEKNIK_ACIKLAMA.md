@@ -196,7 +196,11 @@ Not: İlk kolon `Unnamed` veya rakam olabilir; parser otomatik atlar.
 
 - **Türkçe karakter normalizasyonu:** `İ→I`, `Ş→S`, `Ğ→G`, `Ü→U`, `Ö→O`, `Ç→C` yapılır; `ARCH`, `IMIM`, `GITA`, `INAR` prefix’li dersler analiz dışı bırakılır.
 - **Type safety:** `isikun_final_program.py`’de `to_int()`, `to_bool()`, `norm_code()`, `parse_days()` gibi yardımcılar sayesinde Excel hücre tipi (str/int/float/None) fark etmeksizin çalışılır.
-- **Thread safety:** `AppState` global static’tir; çok kullanıcılı deployment için session-based refactor gerekir.
+- **Thread safety:** `AppState` artık `@dataclass` + `field(default_factory=...)` ile tanımlanır. Global `appstate = AppState()` instance'ı kullanılır. `reset_all_state()` yeni bir `AppState()` oluşturur. Çok kullanıcılı deployment için `flask.g` tabanlı refactor önerilir.
+- **Magic number kaldırıldı:** `MAX_CAP = 10 ** 9` sabiti tanımlanmıştır; tüm kapasite sınırları bu sabit üzerinden yönetilir.
+- **Code quality:** `base_code()` lowercase replace bug düzeltildi, `to_int()` sadeleştirildi, `COURSE_COLS` duplicate key (smart quote) temizlendi.
+- **Dead code kaldırıldı:** `diagnose_all_issues` içindeki `a==b` ölü kod kontrolü kaldırıldı (`load_conflicts_csv` zaten eliyor). `analyze_assignment_issues` içindeki kullanılmayan `n_days`/`spd` değişkenleri kaldırıldı.
+- **Performance:** `slot_caps_obj()` `_slot_caps_obj_cache` ile cache'lendi; `slot_caps` değiştiğinde otomatik invalidate edilir.
 
 ---
 

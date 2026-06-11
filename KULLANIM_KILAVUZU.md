@@ -156,8 +156,9 @@ Her anahtar ders kodu, değer `[gün, slot]` listesidir.
 | **Feasibility Doctor** | `diagnose_all_issues()` 7 alt fonksiyona bölündü; okunabilirlik ve bakım kolaylığı arttı. |
 | **Cache Helper'ları** | `get_conflict_pairs()` ve `get_group_pairs()` eklendi; çakışma verisi her fonksiyonda yeniden oluşturulmuyor. |
 | **MAX_CAP Sabiti** | `10**9` magic number yerine `MAX_CAP = 10 ** 9` sabiti tanımlandı. |
-| **Greedy Optimize** | `greedy_preview()` içindeki gereksiz ikinci `fits()` döngüsü kaldırıldı. |
-| **Bugfix'ler** | `base_code()` lowercase replace bug düzeltildi, `to_int()` sadeleştirildi. |
+| **Code Quality** | `base_code()` lowercase replace bug düzeltildi, `to_int()` sadeleştirildi, `COURSE_COLS` duplicate key (smart quote) temizlendi. |
+| **Dead Code** | `diagnose_all_issues` içindeki `a==b` ölü kod kontrolü kaldırıldı. `analyze_assignment_issues` içindeki kullanılmayan `n_days`/`spd` değişkenleri kaldırıldı. |
+| **Performance** | `slot_caps_obj()` `_slot_caps_obj_cache` ile cache'lendi; `slot_caps` değiştiğinde otomatik invalidate edilir. |
 
 ---
 
