@@ -23,9 +23,11 @@ final takvim new/
 └── .gitignore
 ```
 
-**Kritik nokta:** `isikun_final_program.py` ve `KONTROL UYGULAMASI/ana_kontrol.py` birbirini çağırmaz. İki bağımsız araçtır:
+**Kritik nokta:**
+- `isikun_final_program.py` ve `KONTROL UYGULAMASI/ana_kontrol.py` birbirini çağırmaz; iki bağımsız araçtır.
 - **Flask Uygulaması** → program *oluşturur* ve *optimize eder*.
 - **Kontrol Aracı** → mevcut Excel programını *doğrular* ve *raporlar*.
+- **Ancak** Flask uygulamasının kendi içinde de `run_kontrol_analizi`, `diagnose_all_issues` ve `analyze_assignment_issues` gibi kontrol/değerlendirme fonksiyonları vardır. Bu fonksiyonlar web arayüzündeki **Kontrol** ve **Değiştir** sekmelerini besler. `ana_kontrol.py` ise komut satırından çalıştırılan bağımsız bir analiz aracıdır.
 
 ---
 

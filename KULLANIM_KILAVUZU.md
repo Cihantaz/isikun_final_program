@@ -135,7 +135,7 @@ Her anahtar ders kodu, değer `[gün, slot]` listesidir.
 ## 4. Sık Karşılaşılan Sorular
 
 **S: Flask uygulaması ile kontrol aracı arasındaki fark nedir?**
-> Flask uygulaması **program oluşturur**; kontrol aracı **var olan programı analiz eder**.
+> Flask uygulaması **program oluşturur** ve kendi içinde de **kontrol/değerlendirme** yapar (Kontrol ve Değiştir sekmeleri). `ana_kontrol.py` ise komut satırından çalıştırılan, mevcut bir Excel programını analiz eden bağımsız bir araçtır.
 
 **S: `ARCH`, `IMIM`, `GITA`, `INAR` dersleri neden analize dahil edilmiyor?**
 > Bu fakültelerin dersleri ayrı takvimde yönetilir; çakışma ve kısıt analizine dahil edilmez.
