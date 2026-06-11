@@ -1414,8 +1414,13 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
     
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         AppState.last_diagnostics.append("Çözüm bulunamadı. Tercih günleri ve diğer kısıtlar hard olarak uygulandı.")
+        # Hangi derslerin hiç uygun slotu yok?
+        zero_allowed = [c for c in courses if not allowed.get(c)]
+        if zero_allowed:
+            AppState.last_diagnostics.append(f"Hiç uygun slotu olmayan dersler ({len(zero_allowed)}): {', '.join(zero_allowed[:10])}")
         AppState.last_diagnostics.extend(diagnose_all_issues())
-        return False, "Çözüm bulunamadı. Kısıtlar nedeniyle yerleştirme mümkün değil."
+        n_diag = len(AppState.last_diagnostics)
+        return False, f"Çözüm bulunamadı. Kısıtlar nedeniyle yerleştirme mümkün değil. ({n_diag} adet teşhis notu üretildi. Ekrandaki Uyarılar sekmesini kontrol edin.)"
 
     assigned_map: Dict[str, Tuple[int, int]] = {}
     unassigned: List[str] = []
@@ -1664,8 +1669,7 @@ def run_kontrol_analizi() -> Dict[str, Any]:
     degisecek_set: set[str] = set()
     for ih in cakisma_ihlal + diffday_ihlal + diffslot_ihlal:
         for code in (ih["ders1"], ih["ders2"]):
-            if any(code.startswith(p) for p in ("COMP", "SOFT", "PSYC", "PSKO")):
-                degisecek_set.add(code)
+            degisecek_set.add(code)
 
     degisecek_dersler = sorted(degisecek_set)
 
@@ -2323,6 +2327,8 @@ def apply_changes():
 
     if updated:
         flash(f"{updated} ders guncellendi.", "success")
+        # Degisiklik sonrasi otomatik kontrol
+        run_kontrol_analizi()
     else:
         flash("Guncellenecek ders bulunamadi.", "warning")
     return same_tab(request.args.get("tab", "degistir"))
@@ -2332,8 +2338,11 @@ def apply_changes():
 def download_excel():
     try:
         data = build_excel()
+    except RuntimeError as e:
+        flash(f"Excel indirilemedi: {e}", "danger")
+        return same_tab(request.args.get("tab", "solve"))
     except Exception as e:
-        flash(str(e), "danger")
+        flash(f"Excel indirilemedi: {e}", "danger")
         return same_tab(request.args.get("tab", "solve"))
     return send_file(io.BytesIO(data), as_attachment=True, download_name="schedule.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
