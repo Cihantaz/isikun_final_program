@@ -1,0 +1,30 @@
+# Python cache dosyaları
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Sanal ortamlar
+venv/
+.venv/
+env/
+.env/
+
+# IDE / Editor dosyaları
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sistem dosyaları
+.DS_Store
+Thumbs.db
+
+# Log dosyaları
+*.log
+
+# SQLite veritabanı
+app.db
+
+# Geçici veriler
+*.tmp
+*.bak

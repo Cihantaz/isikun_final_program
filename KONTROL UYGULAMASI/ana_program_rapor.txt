@@ -1,0 +1,134 @@
+================================================================================
+26 BAHAR FINAL - ANA PROGRAM KONTROL RAPORU
+================================================================================
+Tarih: 2026-06-03
+Analiz Edilen: 26 bahar final _ son.xlsx
+================================================================================
+
+1. GENEL ISTATISTIKLER
+----------------------
+  Ana programda parse edilen ders         : 325 adet
+  Bilinmeyen slotlu ders (ozel saatler)   : 138 adet
+    - Bu derslerin cogu CORE dersleri veya 17:30, 20:00, 22:30 gibi
+      standart disi saatlerde atanmis.
+
+2. CAKISMA ANALIZI
+------------------
+  Cakisma dosyasindaki toplam cift        : 3338 (schedule'da olan)
+  GERCEK CAKISMA (ayni gun + ayni slot)   : 7 adet
+
+  CAKISAN DERSLER:
+    1. ENTA3112 - ENTA4602 | Ortak: 1 ogrenci | G1/S1 (08.06.2026 08:30)
+    2. ENTA3112 - GERM1101 | Ortak: 1 ogrenci | G1/S1 (08.06.2026 08:30)
+    3. ENTA3604 - ITAL1102 | Ortak: 1 ogrenci | G10/S1 (19.06.2026 08:30)
+    4. ENTA4601 - ENTA4602 | Ortak: 2 ogrenci | G1/S1 (08.06.2026 08:30)
+    5. ENTA4601 - GERM1101 | Ortak: 1 ogrenci | G1/S1 (08.06.2026 08:30)
+    6. ENTA4601 - GORS3362 | Ortak: 3 ogrenci | G1/S1 (08.06.2026 08:30)
+    7. ENTA4602 - GORS3362 | Ortak: 3 ogrenci | G1/S1 (08.06.2026 08:30)
+
+  NOT: 7 cakismanin tamami ENTA (Endustri Tasarimi) ve dil derslerinden
+       kaynaklaniyor. G1/S1 slotunda 5 farkli ders birbiriyle cakismis.
+
+3. KISIT DOSYASI ANALIZI
+--------------------------
+  Farkli gun ihlali (DiffDay)             : 7 adet
+    - INDE2001 - INDE2211 | G9/S1 - G9/S2 (ayni gun)
+    - BUSI4573 - INDE4902 | G10/S2 - G10/S1 (ayni gun)
+    - INDE3312 - INDE3314 | G1/S2 - G1/S1 (ayni gun)
+    - INDE4185 - INDE4181 | G9/S3 - G9/S1 (ayni gun)
+    - INDE2452 - INDE4902 | G10/S3 - G10/S1 (ayni gun)
+    NOT: Bazi ciftler tekrar ediyor, tekil ihlal sayisi: 5
+
+  Farkli slot ihlali (DiffSlot - ayni gun+slot): 6 adet
+    - SOFT4221 - SOFT4221 | G3/S3 (kendisiyle - kisit dosyasi hatasi)
+    - SOFT4902 - SOFT4902 | G9/S2 (kendisiyle - kisit dosyasi hatasi)
+    - SOFT4912 - SOFT4912 | G9/S1 (kendisiyle - kisit dosyasi hatasi)
+    - INDE4902 - INDE4912 | G10/S1
+    - MATH1111 - MATH1301 | G6/S2
+    - MATH1111 - MATE1301 | G6/S2
+
+  Ayni gun ihlali (SameDay)               : 0 adet
+  Ayni slot ihlali (SameSlot)             : 0 adet
+
+4. ITEC4431 ANALIZI
+-------------------
+  Mevcut durum: ITEC4431 ana programda YOK (eksik)
+  Cakisan ders sayisi: 26 adet
+  
+  En cok cakisan dersler:
+    1. MISY4461  | Ortak: 10 ogrenci | Mevcut: G2/S1
+    2. MISY3116  | Ortak:  9 ogrenci | Mevcut: G3/S2
+    3. MISY3325  | Ortak:  4 ogrenci | Mevcut: G1/S1
+    4. MISY4486  | Ortak:  4 ogrenci | Mevcut: G10/S3
+    5. MISY4901  | Ortak:  4 ogrenci | Mevcut: G1/S3
+    6. TSLA1101  | Ortak:  4 ogrenci | Mevcut: G7/S2
+    7. BUSI2111  | Ortak:  3 ogrenci | Mevcut: G5/S3
+    8. ECON4802  | Ortak:  3 ogrenci | Mevcut: G3/S3
+    9. MATH2103  | Ortak:  3 ogrenci | Mevcut: G1/S2
+    10. BUSI4572 | Ortak:  2 ogrenci | Mevcut: G3/S1
+
+  ITEC4431 ICIN UYGUN SLOTLAR (13 adet):
+    G2/S3  (09.06.2026 Salı     14:30-17:30)
+    G4/S2  (11.06.2026 Perşembe 11:30-14:30)
+    G5/S1  (12.06.2026 Cuma     08:30-11:30)
+    G6/S1  (15.06.2026 Pazartesi 08:30-11:30)
+    G6/S2  (15.06.2026 Pazartesi 11:30-14:30)
+    G6/S3  (15.06.2026 Pazartesi 14:30-17:30)
+    G7/S3  (16.06.2026 Salı     14:30-17:30)
+    G8/S1  (17.06.2026 Çarşamba 08:30-11:30)
+    G8/S2  (17.06.2026 Çarşamba 11:30-14:30)
+    G8/S3  (17.06.2026 Çarşamba 14:30-17:30)
+    G9/S1  (18.06.2026 Perşembe 08:30-11:30)
+    G9/S2  (18.06.2026 Perşembe 11:30-14:30)
+    G9/S3  (18.06.2026 Perşembe 14:30-17:30)
+
+  ONERI: G8/S2 (17.06.2026 Carsamba 11:30-14:30) veya G9/S1
+         (18.06.2026 Persembe 08:30-11:30) en uygun seceneklerdir.
+         Cakisan derslerin hicbiri bu slotlarda degil.
+
+5. FAKULTE BAZLI ANALIZ
+-------------------------
+  +------------------------------------------------+--------+---------+----+----+
+  | Fakulte                                        | Toplam | Cakisma | DD | DS |
+  +------------------------------------------------+--------+---------+----+----+
+  | Muhendislik ve Doga Bilimleri Fakultesi        | 121    | 0       | 7  | 6  |
+  | Sanat, Tasarim ve Mimarlik Fakultesi           | 99     | 7       | 0  | 0  |
+  | Yabanci Diller Okulu                           | 8      | 3       | 0  | 0  |
+  | Iktisadi, Idari ve Sosyal Bilimler Fakultesi   | 97     | 0       | 2  | 0  |
+  +------------------------------------------------+--------+---------+----+----+
+
+  Aciklama:
+  - Muhendislik: INDE ve MATH/MATE derslerinden kaynakli ihlaller var,
+    ogrenci cakismasi yok.
+  - Sanat/Tasarim/Mimarlik: ENTA ve dil derslerinden 7 adet cakisma var.
+    Bu cakismalarin cogu G1/S1 slotunda yogunlasmis.
+  - Yabanci Diller: GERM, ITAL, SPAN gibi dil derslerinden 3 cakisma var.
+  - Iktisadi/Idari/Sosyal: 2 adet farkli gun ihlali (BUSI-INDE) var,
+    ogrenci cakismasi yok.
+
+6. EKSIK DERSLER
+----------------
+  Ana programda olmayan ama cakisma dosyasinda olan ders: 202 adet
+  
+  Kategoriler:
+    - CORE dersleri: 15 adet
+    - Proje/Seminer dersleri: 31 adet
+    - Diger dersler: 156 adet
+  
+  Ornek eksik dersler:
+    BMED3910, BMED3920, BMED4902, COMP3910, COMP3920,
+    COMP4910, COMP4920, CORE0102, CORE0104, ...
+
+================================================================================
+SONUC DEGERLENDIRMESI
+================================================================================
+
+  [+] Program genel olarak basarili. 325 dersten sadece 7 cakisma var.
+  [-] ENTA dersleri G1/S1'de yogunlasmis, duzeltilmeli.
+  [-] ITEC4431 programa eklenmemis, G8/S2 veya G9/S1 onerilir.
+  [-] INDE/BUSI derslerinde farkli gun kisitlari ihlal edilmis.
+  [-] MATH1111 ile MATH1301/MATE1301 ayni slotta.
+
+  ONEMLI: Program kullanilabilir durumda ancak 7 ogrenci cakismasi
+          ve bazi kisit ihlalleri gozden gecirilmeli.
+================================================================================

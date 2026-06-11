@@ -1,0 +1,121 @@
+============================================================
+FINAL SINAV PROGRAMI ANALIZI - NASIL YAPILDI
+============================================================
+Tarih: 2026-06-02
+Analiz Yapan: Kimi Code CLI
+============================================================
+
+1. KULLANILAN DOSYALAR
+----------------------
+Analiz icin asagidaki dosyalar kullanildi:
+
+  a) Cakisma Dosyasi:
+     Yol: "26 BAHAR FINAL\UYGULAMA DOSYALARI\final_exam_collisions_14_05_2026_10_48_47.csv"
+     Icerik: Course1, Course2, Common Student Count
+     Her satir iki ders arasindaki ortak ogrenci sayisini gosterir.
+     A,B ve B,A ayni anlama gelir (cift tarafli).
+
+  b) Schedule Dosyasi:
+     Yol: "26 BAHAR FINAL\UYGULAMA DOSYALARI\schedule (5).xlsx"
+     Icerik: Ders Kodu, Ders Adi, Slotlar (ornegin G1/S3)
+     G = Gun (1-10), S = Slot (1-3)
+
+  c) Kisit Dosyasi:
+     Yol: "26 BAHAR FINAL\UYGULAMA DOSYALARI\ders_kisitleri.xlsx"
+     Icerik: A (Ayni Gun), B (Ayni Slot), C (Farkli Gun), D (Farkli Slot)
+     Her kolonda virgulle ayrilmis ders kodlari bulunur.
+
+2. CAKISMA ANALIZI MANTIGI
+--------------------------
+  1. Schedule dosyasindaki her dersin slot bilgisi parse edildi:
+     Gx/Sy -> (gun=x, slot=y)
+
+  2. Cakisma dosyasindaki her ders cifti kontrol edildi:
+     - ARCH, IMIM, GITA, INAR ile baslayan dersler haric tutuldu.
+     - Her iki ders de schedule'da varsa karsilastirildi.
+     - Iki ders AYNI gun (G) ve AYNI slot (S) ise -> GERCEK CAKISMA
+     - Farkli gun veya ayni gun farkli slot -> CAKISMA YOK
+
+  3. Kisit dosyasindaki kurallar schedule ile karsilastirildi:
+     - Ayni Gun kisiti: Listedeki dersler ayni gunde olmali
+     - Ayni Slot kisiti: Listedeki dersler ayni slotta olmali
+     - Farkli Gun kisiti: Listedeki dersler farkli gunlerde olmali
+     - Farkli Slot kisiti: Listedeki dersler farkli slotta olmali
+     
+     ONEMLI KURAL (Farkli Slot):
+     Farkli slot kisiti sadece iki ders AYNI GUNE atandiginda
+     anlamli. Farkli gunde olanlar zaten uyumlu sayilir.
+     Yani:
+     - Ayni gun + ayni slot  -> IHLAL
+     - Ayni gun + farkli slot -> Uygun
+     - Farkli gun (herhangi slot) -> Uygun
+
+3. BULUNAN SONUCLAR
+-------------------
+  - OGRENCI CAKISMASI: 0 (mukemmel)
+    Hicbir ders cifti ayni gun ve ayni slotta atanmamis.
+
+  - FARKLI GUN IHLALI: 15 cift
+    Bu ciftler "farkli gun" kuralina gore ayni gunde kalmis.
+    Ancak hepsi farkli slotta, bu yuzden ogrenci cakismasi yok.
+
+  - FARKLI SLOT IHLALI (AYNI GUN + AYNI SLOT): 12 cift
+    Bu ciftler ayni gun ve ayni slotta.
+    Ancak cakisma dosyasinda ortak ogrencileri yok.
+    
+  - FARKLI SLOT (AYNI GUN + FARKLI SLOT): 18 cift
+    Kurala uygun, sorun yok.
+    
+  - FARKLI SLOT (FARKLI GUN): 211 cift
+    Kurala uygun, farkli gun oldugu icin slot farki sart degil.
+
+  - EKSIK DERSLER: 215 adet
+    Schedule'da olmayan ama cakisma dosyasinda olan dersler.
+    Bunlarin cogu CORE (15) ve Proje/Seminer (31) dersleridir.
+
+4. POWER2 COPY.PY KOD ANALIZI (Kisitlar)
+-----------------------------------------
+  load_group_constraints_excel fonksiyonu:
+  - Excel'den ilk 4/5 kolonu okur.
+  - Mapping: SameDay, SameSlot, DifferentDay, DifferentSlot
+  - BULUNAN HATA: Unnamed kolonu atlayamiyordu, kolonlar kaymisti.
+    A (Ayni Gun) -> SameSlot olarak okunuyordu (yanlis!)
+    B (Ayni Slot) -> DifferentDay olarak okunuyordu (yanlis!)
+    C (Farkli Gun) -> DifferentSlot olarak okunuyordu (yanlis!)
+    D (Farkli Slot) -> hic okunmuyordu (eksik!)
+  - DUZELTME YAPILDI.
+
+  cpsat_solve fonksiyonunda grup kisitlari:
+  - SameSlot  : model.Add(t[a] == t[b]).OnlyEnforceIf(ba)
+    -> Iki ders ayni periyoda (gun+slot) atanir.
+  
+  - DifferentSlot: model.Add(t[a] != t[b]).OnlyEnforceIf(ba)
+    -> Iki ders farkli periyoda atanir.
+    ONEMLI: t[a] != t[b] kisiti zaten otomatik olarak:
+    - Farkli gun = farkli periyot = kural saglanir
+    - Ayni gun ayni slot = ayni periyot = IHLAL
+    - Ayni gun farkli slot = farkli periyot = kural saglanir
+    Yani implementasyon "farkli slot sadece ayni gunde anlamli"
+    kuralina UYGUNDUR.
+  
+  - SameDay   : model.Add(da == db).OnlyEnforceIf(ba)
+  - DifferentDay: model.Add(da != db).OnlyEnforceIf(ba)
+
+5. KULLANILAN PYTHON KODLARI
+------------------------------
+  - analiz.py          : Temel dosya yapisi incelemesi
+  - analiz_detay.py    : Cakisma ve kisit analizi
+  - analiz_detay2.py   : Eksik ders analizi
+  - analiz_program.py  : 2026 Bahar Final Programi.xlsx incelemesi
+  - rapor.py           : Genel rapor olusturma
+  - gercek_ihlal.py    : Sadece ayni gun ihlalleri
+  - ozet_ihlal.py      : Tekrar temizlenmis ihlal listesi
+  - yeni_analiz.py     : Farkli slot kisiti ozel analizi
+
+6. NEREDE CALISTIRILDI
+----------------------
+  Tum Python kodlari su klasorde calistirildi:
+  C:\Users\cihan.tazeoz\Desktop\Uygulamalar\final takvim new\power\
+  Ciktilar ise "KONTROL UYGULAMASI" alt klasorune tasindi.
+
+============================================================

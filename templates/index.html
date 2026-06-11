@@ -1,0 +1,1279 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sınav Takvim Yönetimi</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+  <style>
+    :root {
+      --sidebar-width: 260px;
+      --primary: #0d6efd;
+      --success: #198754;
+      --warning: #ffc107;
+      --danger: #dc3545;
+      --info: #0dcaf0;
+    }
+    body {
+      background: #f1f5f9;
+      font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    /* Sidebar */
+    .sidebar {
+      width: var(--sidebar-width);
+      min-height: 100vh;
+      background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+      color: #cbd5e1;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1030;
+      transition: transform .3s ease;
+      overflow-y: auto;
+    }
+    .sidebar .brand {
+      padding: 1.25rem;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+    }
+    .sidebar .nav-link {
+      color: #94a3b8;
+      padding: .75rem 1.25rem;
+      border-radius: 0;
+      border-left: 3px solid transparent;
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      transition: all .2s;
+    }
+    .sidebar .nav-link:hover,
+    .sidebar .nav-link.active {
+      color: #fff;
+      background: rgba(255,255,255,.06);
+      border-left-color: var(--primary);
+    }
+    .sidebar .nav-link i {
+      font-size: 1.1rem;
+      width: 1.5rem;
+      text-align: center;
+    }
+    /* Main */
+    .main-content {
+      margin-left: var(--sidebar-width);
+      padding: 1.5rem;
+    }
+    /* Topbar */
+    .topbar {
+      background: #fff;
+      border-radius: .75rem;
+      padding: .75rem 1.25rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    /* Cards */
+    .card {
+      border: none;
+      border-radius: .75rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .card-header {
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 1rem 1.25rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      border-radius: .75rem .75rem 0 0 !important;
+    }
+    /* Stat cards */
+    .stat-card {
+      background: #fff;
+      border-radius: .75rem;
+      padding: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      transition: transform .15s;
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+    }
+    .stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: .75rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      color: #fff;
+    }
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      line-height: 1;
+      color: #1e293b;
+    }
+    .stat-label {
+      font-size: .8rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+    /* Badges & chips */
+    .chip {
+      display: inline-block;
+      padding: .2rem .55rem;
+      background: #e0e7ff;
+      color: #3730a3;
+      border-radius: .4rem;
+      font-size: .82rem;
+      font-weight: 500;
+    }
+    .chip-warn { background: #fef3c7; color: #92400e; }
+    .chip-danger { background: #fee2e2; color: #991b1b; }
+    .chip-success { background: #dcfce7; color: #166534; }
+    /* Heat map cell */
+    .heat-cell {
+      text-align: center;
+      font-weight: 600;
+      border-radius: .5rem;
+      padding: .6rem .4rem;
+      color: #fff;
+      text-shadow: 0 1px 2px rgba(0,0,0,.25);
+    }
+    /* Tables */
+    .table-modern thead th {
+      background: #f8fafc;
+      color: #475569;
+      font-weight: 600;
+      font-size: .82rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      border-bottom: 2px solid #e2e8f0;
+      padding: .75rem;
+    }
+    .table-modern tbody td {
+      padding: .65rem .75rem;
+      vertical-align: middle;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .table-modern tbody tr:hover {
+      background: #f8fafc;
+    }
+    /* Buttons */
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+    }
+    /* Form labels */
+    .form-label {
+      font-size: .82rem;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: .35rem;
+    }
+    /* Floating quick action */
+    .fab-group {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      z-index: 1040;
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+    }
+    .fab-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,.15);
+      transition: transform .2s;
+    }
+    .fab-btn:hover { transform: scale(1.08); }
+    /* Toast container */
+    .toast-container {
+      position: fixed;
+      top: 1.25rem;
+      right: 1.25rem;
+      z-index: 1060;
+    }
+    /* Progress */
+    .progress-sm { height: .5rem; border-radius: .25rem; }
+    /* Mobile sidebar toggle */
+    .sidebar-toggle {
+      display: none;
+      background: none;
+      border: none;
+      color: #475569;
+      font-size: 1.5rem;
+    }
+    @media (max-width: 991.98px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+      .sidebar.show { transform: translateX(0); }
+      .main-content { margin-left: 0; }
+      .sidebar-toggle { display: block; }
+    }
+    /* Tab transition */
+    .tab-pane { display: none; animation: fadeIn .3s ease; }
+    .tab-pane.show.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: translateY(0);} }
+  </style>
+</head>
+<body>
+
+<!-- Toast Notifications -->
+<div class="toast-container">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for cat, msg in messages %}
+        <div class="toast align-items-center text-white bg-{{ 'danger' if cat=='error' else cat }} border-0 show" role="alert" data-bs-delay="6000">
+          <div class="d-flex">
+            <div class="toast-body"><i class="bi bi-info-circle me-2"></i>{{msg}}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+          </div>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+</div>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+  <div class="brand">
+    <i class="bi bi-calendar-check-fill text-primary"></i>
+    <span>Sınav Takvimi</span>
+  </div>
+  <div class="nav flex-column mt-2">
+    <a class="nav-link {% if active_tab=='calendar' %}active{% endif %}" href="{{ url_for('index', tab='calendar') }}">
+      <i class="bi bi-calendar3"></i> Takvim & Slot
+    </a>
+    <a class="nav-link {% if active_tab=='courses' %}active{% endif %}" href="{{ url_for('index', tab='courses') }}">
+      <i class="bi bi-book"></i> Dersler
+      <span class="badge bg-light text-dark ms-auto">{{ courses|length }}</span>
+    </a>
+    <a class="nav-link {% if active_tab=='conflicts' %}active{% endif %}" href="{{ url_for('index', tab='conflicts') }}">
+      <i class="bi bi-shuffle"></i> Çakışma & Grup
+    </a>
+    <a class="nav-link {% if active_tab=='instructors' %}active{% endif %}" href="{{ url_for('index', tab='instructors') }}">
+      <i class="bi bi-people"></i> Eğitim Elemanları
+    </a>
+    <a class="nav-link {% if active_tab=='slotcaps' %}active{% endif %}" href="{{ url_for('index', tab='slotcaps') }}">
+      <i class="bi bi-speedometer2"></i> Slot Kapasiteleri
+    </a>
+    <a class="nav-link {% if active_tab=='seeds' %}active{% endif %}" href="{{ url_for('index', tab='seeds') }}">
+      <i class="bi bi-pin-angle"></i> Tohum Atamalar
+    </a>
+    <a class="nav-link {% if active_tab=='preview' %}active{% endif %}" href="{{ url_for('index', tab='preview') }}">
+      <i class="bi bi-eye"></i> Hızlı Önizleme
+    </a>
+    <a class="nav-link {% if active_tab=='solve' %}active{% endif %}" href="{{ url_for('index', tab='solve') }}">
+      <i class="bi bi-cpu"></i> Kesin Yerleştir
+    </a>
+    <a class="nav-link {% if active_tab=='kontrol' %}active{% endif %}" href="{{ url_for('index', tab='kontrol') }}">
+      <i class="bi bi-shield-check"></i> Kontrol
+    </a>
+    <a class="nav-link {% if active_tab=='degistir' %}active{% endif %}" href="{{ url_for('index', tab='degistir') }}">
+      <i class="bi bi-arrow-left-right"></i> Değiştir
+    </a>
+    <a class="nav-link {% if active_tab=='reports' %}active{% endif %}" href="{{ url_for('index', tab='reports') }}">
+      <i class="bi bi-bar-chart-line"></i> Raporlar
+    </a>
+  </div>
+
+  <div class="mt-auto p-3 border-top border-secondary">
+    <small class="text-muted d-block mb-2">Durum</small>
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <span class="badge bg-success">Sabit</span>
+      <small>{% if check_fixed_ok %}✔ Uygun{% else %}✖ İhlal Var{% endif %}</small>
+    </div>
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <span class="badge bg-info">Kapasite</span>
+      <small>{% if check_caps_ok %}✔ Uygun{% else %}✖ İhlal Var{% endif %}</small>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge bg-warning text-dark">Grup</span>
+      <small>{% if check_groups_ok %}✔ Uygun{% else %}✖ İhlal Var{% endif %}</small>
+    </div>
+  </div>
+</nav>
+
+<!-- Overlay for mobile -->
+<div class="position-fixed top-0 start-0 w-100 h-100 bg-dark" style="opacity:0; pointer-events:none; z-index:1025; transition:opacity .3s;" id="sidebarOverlay"></div>
+
+<!-- Main Content -->
+<div class="main-content">
+
+  {% if diagnostics %}
+  <div class="card border-warning mb-3">
+    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-exclamation-triangle-fill"></i> Sistem Uyarıları ({{ diagnostics|length }} adet)</span>
+      <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="collapse" data-bs-target="#diagCollapse"><i class="bi bi-chevron-down"></i></button>
+    </div>
+    <div class="collapse show" id="diagCollapse">
+      <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+          {% for note in diagnostics %}
+            <li class="list-group-item">
+              {% if note.startswith('ÇELİŞKİ') %}<span class="badge bg-danger me-2">ÇELİŞKİ</span>
+              {% elif note.startswith('UYARI') %}<span class="badge bg-warning text-dark me-2">UYARI</span>
+              {% elif note.startswith('KAPASİTE') %}<span class="badge bg-info me-2">KAPASİTE</span>
+              {% elif note.startswith('TAKVİM') %}<span class="badge bg-primary me-2">TAKVİM</span>
+              {% else %}<span class="badge bg-secondary me-2">BİLGİ</span>{% endif %}
+              {{ note }}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="d-flex align-items-center gap-3">
+      <button class="sidebar-toggle" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+      <h5 class="mb-0 fw-bold text-dark">{{ {
+        'calendar':'Takvim & Slot Ayarları',
+        'courses':'Ders Yönetimi',
+        'conflicts':'Çakışmalar & Grup Kısıtları',
+        'instructors':'Eğitim Elemanları',
+        'slotcaps':'Slot Kapasiteleri',
+        'seeds':'Tohum Atamaları',
+        'preview':'Hızlı Önizleme (Greedy)',
+        'solve':'Kesin Yerleştir (CP-SAT)',
+        'kontrol':'Kontrol Sonuçları',
+        'degistir':'Değişiklik Önerileri',
+        'reports':'Raporlar & Isı Haritası'
+      }[active_tab] }}</h5>
+    </div>
+    <div class="d-flex gap-2">
+      <form method="post" action="{{ url_for('run_preview') }}?tab=preview" class="m-0">
+        <button class="btn btn-success btn-sm btn-action">
+          <i class="bi bi-eye"></i> <span class="d-none d-md-inline">Önizleme</span>
+        </button>
+      </form>
+      <form method="post" action="{{ url_for('run_solve') }}?tab=solve" class="m-0">
+        <button class="btn btn-danger btn-sm btn-action">
+          <i class="bi bi-cpu"></i> <span class="d-none d-md-inline">Çöz</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== CALENDAR TAB ===== -->
+  <div class="tab-pane {% if active_tab=='calendar' %}show active{% endif %}" id="tab-calendar">
+    <div class="row g-3 mb-4">
+      <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-primary"><i class="bi bi-calendar3"></i></div><div><div class="stat-value">{{ cal.n_days }}</div><div class="stat-label">Gün Sayısı</div></div></div></div>
+      <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-info"><i class="bi bi-clock"></i></div><div><div class="stat-value">{{ cal.slots_per_day }}</div><div class="stat-label">Gün Başına Slot</div></div></div></div>
+      <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-warning text-dark"><i class="bi bi-hourglass-split"></i></div><div><div class="stat-value">{{ cal.slot_length_min }}dk</div><div class="stat-label">Slot Süresi</div></div></div></div>
+      <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-success"><i class="bi bi-book"></i></div><div><div class="stat-value">{{ courses|length }}</div><div class="stat-label">Toplam Ders</div></div></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><i class="bi bi-gear"></i> Takvim & Slot Ayarları</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('save_calendar') }}?tab=calendar" class="row g-3">
+          <div class="col-md-3"><label class="form-label">Gün Sayısı</label><input type="number" name="n_days" class="form-control" value="{{ cal.n_days }}"></div>
+          <div class="col-md-3"><label class="form-label">Gün Başına Slot</label><input type="number" name="slots_per_day" class="form-control" value="{{ cal.slots_per_day }}"></div>
+          <div class="col-md-3"><label class="form-label">Slot Süresi (dk)</label><input type="number" name="slot_length_min" class="form-control" value="{{ cal.slot_length_min }}"></div>
+          <div class="col-md-3"><label class="form-label">Tampon Süre (dk)</label><input type="number" name="buffer_minutes" class="form-control" value="{{ cal.buffer_minutes }}"></div>
+          <div class="col-md-3"><label class="form-label">Gün Başlangıç</label><input type="text" name="day_start_time" class="form-control" value="{{ cal.day_start_time }}"></div>
+          <div class="col-md-3"><label class="form-label">Gün Bitiş</label><input type="text" name="day_end_time" class="form-control" value="{{ cal.day_end_time }}"></div>
+          <div class="col-md-3">
+            <label class="form-label">Başlangıç Tarihi</label><input type="date" name="start_date" class="form-control" value="{{ cal.start_date or '' }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Bitiş Tarihi</label><input type="date" name="end_date" class="form-control" value="{{ cal.end_date or '' }}">
+          </div>
+          <div class="col-md-3 d-flex align-items-center">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="last_slot_forbidden_for_three_hour" id="lsf" {% if cal.last_slot_forbidden_for_three_hour %}checked{% endif %}>
+              <label class="form-check-label" for="lsf">3 saatlik sınavlar için son slot yasak</label>
+            </div>
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary btn-action"><i class="bi bi-check-lg"></i> Kaydet</button>
+            <a class="btn btn-outline-danger btn-action" href="{{ url_for('reset_all') }}"><i class="bi bi-trash"></i> Tüm Veriyi Sıfırla</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== COURSES TAB ===== -->
+  <div class="tab-pane {% if active_tab=='courses' %}show active{% endif %}" id="tab-courses">
+    <!-- Stats -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-primary"><i class="bi bi-book"></i></div><div><div class="stat-value">{{ courses|length }}</div><div class="stat-label">Toplam Ders</div></div></div></div>
+      {% set ns = namespace(fixed=0, multi=0, threeh=0) %}
+      {% for c in courses.values() %}{% if c.fixed_day is not none %}{% set ns.fixed = ns.fixed + 1 %}{% endif %}{% if c.multi_slots > 1 %}{% set ns.multi = ns.multi + 1 %}{% endif %}{% if c.three_hour %}{% set ns.threeh = ns.threeh + 1 %}{% endif %}{% endfor %}
+      <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-warning text-dark"><i class="bi bi-pin-angle"></i></div><div><div class="stat-value">{{ ns.fixed }}</div><div class="stat-label">Sabit Atamalı</div></div></div></div>
+      <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-info"><i class="bi bi-layers"></i></div><div><div class="stat-value">{{ ns.multi }}</div><div class="stat-label">Multi-Slot</div></div></div></div>
+      <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-danger"><i class="bi bi-hourglass-top"></i></div><div><div class="stat-value">{{ ns.threeh }}</div><div class="stat-label">3 Saatlik</div></div></div></div>
+    </div>
+
+    <!-- Add Course -->
+    <div class="card mb-4">
+      <div class="card-header"><i class="bi bi-plus-circle"></i> Yeni Ders Ekle</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('add_course') }}?tab=courses" class="row g-3">
+          <div class="col-md-3"><label class="form-label">Ders Kodu *</label><input name="code" class="form-control" required placeholder="Örn: MAT101"></div>
+          <div class="col-md-3"><label class="form-label">Ders Adı</label><input name="name" class="form-control" placeholder="Örn: Matematik 1"></div>
+          <div class="col-md-2"><label class="form-label">Süre (dk)</label><input name="duration" type="number" class="form-control" value="120"></div>
+          <div class="col-md-2"><label class="form-label">Öğrenci Sayısı</label><input name="size" type="number" class="form-control" value="0"></div>
+          <div class="col-md-2"><label class="form-label">Multi Slots</label><input name="multi_slots" type="number" class="form-control" value="1"></div>
+          <div class="col-md-3"><label class="form-label">Tercih Günleri</label><input name="preferred_days" class="form-control" placeholder="1,3,5"></div>
+          <div class="col-md-3"><label class="form-label">Engelli Günler</label><input name="forbidden_days" class="form-control" placeholder="2,4"></div>
+          <div class="col-md-2"><label class="form-label">Sabit Gün</label><input name="fixed_day" type="number" class="form-control" placeholder="Gün"></div>
+          <div class="col-md-2"><label class="form-label">Sabit Slot</label><input name="fixed_slot" type="number" class="form-control" placeholder="Slot"></div>
+          <div class="col-md-2 d-flex align-items-center">
+            <div class="form-check form-switch mt-3">
+              <input class="form-check-input" type="checkbox" name="three_hour" id="th"><label class="form-check-label" for="th">3 Saatlik</label>
+            </div>
+          </div>
+          <div class="col-md-6"><label class="form-label">Eğitmen ID’leri</label><input name="instructors" class="form-control" placeholder="I001, I007"></div>
+          <div class="col-12"><button class="btn btn-primary btn-action"><i class="bi bi-plus-lg"></i> Ekle</button></div>
+        </form>
+
+        <hr class="my-4">
+        <h6 class="fw-bold mb-3"><i class="bi bi-file-earmark-excel text-success"></i> Excel ile Yükle</h6>
+        <form method="post" action="{{ url_for('upload_courses_excel') }}?tab=courses" enctype="multipart/form-data" class="row g-2 align-items-end">
+          <div class="col-md-6"><input type="file" name="file" accept=".xlsx,.xls" class="form-control"></div>
+          <div class="col-md-6">
+            <button class="btn btn-outline-success btn-action"><i class="bi bi-upload"></i> Yükle</button>
+            <small class="text-muted ms-2">Kolonlar: Ders Kodu, Ders Adı, Süre (dk), Öğrenci Sayısı, Tercih Günleri, Engelli Günler, Sabit Gün, Sabit Slot, Multi Slots, 3 Saatlik, Eğitmen ID’leri</small>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Edit Course -->
+    {% if edit_course_code %}
+    <div class="card mb-4 border-warning">
+      <div class="card-header bg-warning text-dark"><i class="bi bi-pencil-square"></i> Ders Düzenle: {{ edit_course_code }}</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('update_course') }}?tab=courses" class="row g-3">
+          <input type="hidden" name="code" value="{{ edit_course_code }}">
+          <div class="col-md-3"><label class="form-label">Ders Adı</label><input name="name" class="form-control" value="{{ edit_data.name }}"></div>
+          <div class="col-md-2"><label class="form-label">Süre (dk)</label><input name="duration" type="number" class="form-control" value="{{ edit_data.duration }}"></div>
+          <div class="col-md-2"><label class="form-label">Öğrenci Sayısı</label><input name="size" type="number" class="form-control" value="{{ edit_data.size }}"></div>
+          <div class="col-md-2"><label class="form-label">Multi Slots</label><input name="multi_slots" type="number" class="form-control" value="{{ edit_data.multi_slots }}"></div>
+          <div class="col-md-3"><label class="form-label">Tercih Günleri</label><input name="preferred_days" class="form-control" value="{{ edit_data.preferred_days|join(', ') if edit_data.preferred_days else '' }}"></div>
+          <div class="col-md-3"><label class="form-label">Engelli Günler</label><input name="forbidden_days" class="form-control" value="{{ edit_data.forbidden_days|join(', ') if edit_data.forbidden_days else '' }}"></div>
+          <div class="col-md-2"><label class="form-label">Sabit Gün</label><input name="fixed_day" type="number" class="form-control" value="{{ edit_data.fixed_day }}"></div>
+          <div class="col-md-2"><label class="form-label">Sabit Slot</label><input name="fixed_slot" type="number" class="form-control" value="{{ edit_data.fixed_slot }}"></div>
+          <div class="col-md-2 d-flex align-items-center">
+            <div class="form-check form-switch mt-3">
+              <input class="form-check-input" type="checkbox" name="three_hour" id="th2" {% if edit_data.three_hour %}checked{% endif %}><label class="form-check-label" for="th2">3 Saatlik</label>
+            </div>
+          </div>
+          <div class="col-md-6"><label class="form-label">Eğitmen ID’leri</label><input name="instructors" class="form-control" value="{{ edit_data.instructors|join(', ') }}"></div>
+          <div class="col-12">
+            <button class="btn btn-success btn-action"><i class="bi bi-check-lg"></i> Kaydet</button>
+            <a class="btn btn-outline-secondary" href="{{ url_for('index', tab='courses') }}">Vazgeç</a>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Course List -->
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-ul"></i> Ders Listesi</span>
+        <input type="text" id="searchCourses" class="form-control form-control-sm w-auto" placeholder="🔍 Ders Ara..." onkeyup="filterTable('searchCourses','coursesTable')">
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-modern mb-0" id="coursesTable">
+            <thead><tr><th>Kod</th><th>Ad</th><th>Süre</th><th>Öğr.</th><th>Tercih</th><th>Engel</th><th>Sabit</th><th>Multi</th><th>3s</th><th>Eğitmenler</th><th style="width:120px"></th></tr></thead>
+            <tbody>
+            {% for code,c in courses.items() %}
+              <tr>
+                <td><span class="chip">{{code}}</span></td>
+                <td class="fw-semibold">{{c.name}}</td>
+                <td>{{c.duration}}</td>
+                <td>{{c.size}}</td>
+                <td>{% if c.preferred_days %}<span class="chip chip-success">{{c.preferred_days|join(', ')}}</span>{% endif %}</td>
+                <td>{% if c.forbidden_days %}<span class="chip chip-danger">{{c.forbidden_days|join(', ')}}</span>{% endif %}</td>
+                <td>{% if c.fixed_day %}<span class="chip chip-warn">G{{c.fixed_day}}{% if c.fixed_slot %}/S{{c.fixed_slot}}{% endif %}</span>{% endif %}</td>
+                <td>{% if c.multi_slots > 1 %}<span class="badge bg-info">{{c.multi_slots}}</span>{% else %}1{% endif %}</td>
+                <td>{% if c.three_hour %}<span class="badge bg-danger">3s</span>{% else %}-{% endif %}</td>
+                <td><small>{{c.instructors|join(', ')}}</small></td>
+                <td>
+                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('index', tab='courses', edit_course=code) }}"><i class="bi bi-pencil"></i></a>
+                  <a class="btn btn-sm btn-outline-danger" href="{{ url_for('del_course', code=code) }}?tab=courses"><i class="bi bi-trash"></i></a>
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CONFLICTS TAB ===== -->
+  <div class="tab-pane {% if active_tab=='conflicts' %}show active{% endif %}" id="tab-conflicts">
+    <div class="row g-3 mb-4">
+      <div class="col-md-4"><div class="stat-card"><div class="stat-icon bg-danger"><i class="bi bi-shuffle"></i></div><div><div class="stat-value">{{ conflicts|length }}</div><div class="stat-label">Çakışma Kaydı</div></div></div></div>
+      <div class="col-md-4"><div class="stat-card"><div class="stat-icon bg-info"><i class="bi bi-diagram-3"></i></div><div><div class="stat-value">{{ group_constraints|length }}</div><div class="stat-label">Grup Kısıtı</div></div></div></div>
+      <div class="col-md-4"><div class="stat-card"><div class="stat-icon bg-success"><i class="bi bi-check-circle"></i></div><div><div class="stat-value">{% if check_groups_ok %}Tamam{% else %}İhlal{% endif %}</div><div class="stat-label">Grup Uyumu</div></div></div></div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-6">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-shuffle"></i> Çakışan Dersler</div>
+          <div class="card-body">
+            <form method="post" action="{{ url_for('upload_conflicts_csv') }}?tab=conflicts" enctype="multipart/form-data" class="row g-2 mb-3">
+              <div class="col-8"><input type="file" name="csv_file" accept=".csv" class="form-control form-control-sm"></div>
+              <div class="col-4"><button class="btn btn-sm btn-outline-primary w-100"><i class="bi bi-upload"></i> CSV Yükle</button></div>
+            </form>
+            <form method="post" action="{{ url_for('add_conflict') }}?tab=conflicts" class="row g-2 mb-3">
+              <div class="col-4"><input name="c1" class="form-control form-control-sm" placeholder="Ders A" list="allCoursesDL"></div>
+              <div class="col-4"><input name="c2" class="form-control form-control-sm" placeholder="Ders B" list="allCoursesDL"></div>
+              <div class="col-3"><input name="w" class="form-control form-control-sm" placeholder="Ağırlık" value="30"></div>
+              <div class="col-1"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus-lg"></i></button></div>
+            </form>
+            {% if edit_conflict_idx is not none %}
+            <div class="alert alert-warning py-2">
+              <form method="post" action="{{ url_for('update_conflict') }}?tab=conflicts" class="row g-2 align-items-center">
+                <input type="hidden" name="idx" value="{{ edit_conflict_idx }}">
+                <div class="col-4"><input name="c1" class="form-control form-control-sm" value="{{ conflicts[edit_conflict_idx][0] }}" list="allCoursesDL"></div>
+                <div class="col-4"><input name="c2" class="form-control form-control-sm" value="{{ conflicts[edit_conflict_idx][1] }}" list="allCoursesDL"></div>
+                <div class="col-3"><input name="w" class="form-control form-control-sm" value="{{ conflicts[edit_conflict_idx][2] }}"></div>
+                <div class="col-auto"><button class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i></button></div>
+                <div class="col-auto"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('index', tab='conflicts') }}"><i class="bi bi-x-lg"></i></a></div>
+              </form>
+            </div>
+            {% endif %}
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+              <table class="table table-modern table-sm mb-0" id="conflictsTable">
+                <thead><tr><th>#</th><th>Ders 1</th><th>Ders 2</th><th>Ağırlık</th><th></th></tr></thead>
+                <tbody>
+                {% for (a,b,w) in conflicts %}
+                  <tr>
+                    <td>{{loop.index0+1}}</td><td><span class="chip">{{a}}</span></td><td><span class="chip">{{b}}</span></td><td>{{w}}</td>
+                    <td>
+                      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('index', tab='conflicts', edit_conflict=loop.index0) }}"><i class="bi bi-pencil"></i></a>
+                      <a class="btn btn-sm btn-outline-danger" href="{{ url_for('del_conflict', a=a, b=b, w=w) }}?tab=conflicts"><i class="bi bi-trash"></i></a>
+                    </td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-diagram-3"></i> Grup Kısıtları</div>
+          <div class="card-body">
+            <form method="post" action="{{ url_for('upload_group_constraints_excel') }}?tab=conflicts" enctype="multipart/form-data" class="row g-2 mb-3">
+              <div class="col-8"><input type="file" name="xlsx_file" accept=".xlsx,.xls" class="form-control form-control-sm"></div>
+              <div class="col-4"><button class="btn btn-sm btn-outline-success w-100"><i class="bi bi-upload"></i> Excel Yükle</button></div>
+            </form>
+            <form method="post" action="{{ url_for('add_group_constraint') }}?tab=conflicts" class="row g-2 mb-3">
+              <div class="col-md-4">
+                <select name="type" class="form-select form-select-sm">
+                  <option value="SameDay">Aynı Gün</option>
+                  <option value="DifferentDay">Farklı Gün</option>
+                  <option value="SameSlot">Aynı Slot</option>
+                  <option value="DifferentSlot">Farklı Slot</option>
+                </select>
+              </div>
+              <div class="col-md-7"><input name="courses" class="form-control form-control-sm" placeholder="A,B,C (virgülle)"></div>
+              <div class="col-md-1"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus-lg"></i></button></div>
+            </form>
+
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+              <table class="table table-modern table-sm mb-0">
+                <thead><tr><th>Tür</th><th>Dersler</th><th></th></tr></thead>
+                <tbody>
+                {% for g in group_constraints %}
+                  <tr>
+                    <td>
+                      {% if g.type=='SameDay' %}<span class="badge bg-primary">Aynı Gün</span>
+                      {% elif g.type=='DifferentDay' %}<span class="badge bg-info">Farklı Gün</span>
+                      {% elif g.type=='SameSlot' %}<span class="badge bg-success">Aynı Slot</span>
+                      {% elif g.type=='DifferentSlot' %}<span class="badge bg-warning text-dark">Farklı Slot</span>
+                      {% else %}<span class="badge bg-secondary">{{g.type}}</span>{% endif %}
+                    </td>
+                    <td>{{ g.courses|join(', ') }}</td>
+                    <td><a class="btn btn-sm btn-outline-danger" href="{{ url_for('del_group_constraint', idx=loop.index0) }}?tab=conflicts"><i class="bi bi-trash"></i></a></td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== INSTRUCTORS TAB ===== -->
+  <div class="tab-pane {% if active_tab=='instructors' %}show active{% endif %}" id="tab-instructors">
+    <div class="row g-3 mb-4">
+      <div class="col-md-4"><div class="stat-card"><div class="stat-icon bg-primary"><i class="bi bi-people"></i></div><div><div class="stat-value">{{ instructors|length }}</div><div class="stat-label">Eğitmen</div></div></div></div>
+      <div class="col-md-4"><div class="stat-card"><div class="stat-icon bg-warning text-dark"><i class="bi bi-x-octagon"></i></div><div><div class="stat-value">{{ instructor_unavailability|length }}</div><div class="stat-label">Uygun Olmama</div></div></div></div>
+    </div>
+    <div class="row g-4">
+      <div class="col-lg-6">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-person-plus"></i> Eğitmen Ekle</div>
+          <div class="card-body">
+            <form method="post" action="{{ url_for('add_instructor') }}?tab=instructors" class="row g-2 mb-3">
+              <div class="col-md-3"><input name="instr_id" class="form-control form-control-sm" placeholder="I001"></div>
+              <div class="col-md-4"><input name="name" class="form-control form-control-sm" placeholder="Ad Soyad"></div>
+              <div class="col-md-4"><input name="email" class="form-control form-control-sm" placeholder="E-posta"></div>
+              <div class="col-md-1"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus-lg"></i></button></div>
+            </form>
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+              <table class="table table-modern table-sm mb-0">
+                <thead><tr><th>ID</th><th>Ad</th><th>E-posta</th><th></th></tr></thead>
+                <tbody>
+                {% for iid,info in instructors.items() %}
+                  <tr>
+                    <td><span class="chip">{{iid}}</span></td>
+                    <td>{{info.name}}</td>
+                    <td><small class="text-muted">{{info.email}}</small></td>
+                    <td><a class="btn btn-sm btn-outline-danger" href="{{ url_for('del_instructor', instr_id=iid) }}?tab=instructors"><i class="bi bi-trash"></i></a></td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="card h-100">
+          <div class="card-header"><i class="bi bi-x-octagon"></i> Uygun Olmama Kayıtları</div>
+          <div class="card-body">
+            <form method="post" action="{{ url_for('add_unavailability') }}?tab=instructors" class="row g-2 mb-3">
+              <div class="col-md-3"><input name="instr" class="form-control form-control-sm" placeholder="I001"></div>
+              <div class="col-md-3"><input name="day" type="number" class="form-control form-control-sm" placeholder="Gün"></div>
+              <div class="col-md-3"><input name="slot" type="number" class="form-control form-control-sm" placeholder="Slot"></div>
+              <div class="col-md-3"><button class="btn btn-sm btn-outline-primary w-100"><i class="bi bi-plus-lg"></i> Ekle</button></div>
+            </form>
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+              <table class="table table-modern table-sm mb-0">
+                <thead><tr><th>Eğitmen</th><th>Gün</th><th>Slot</th><th></th></tr></thead>
+                <tbody>
+                {% for un in instructor_unavailability %}
+                  <tr>
+                    <td><span class="chip">{{un.instr}}</span></td>
+                    <td>G{{un.day}}</td>
+                    <td>S{{un.slot}}</td>
+                    <td><a class="btn btn-sm btn-outline-danger" href="{{ url_for('del_unavailability', idx=loop.index0) }}?tab=instructors"><i class="bi bi-trash"></i></a></td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SLOT CAPS TAB ===== -->
+  <div class="tab-pane {% if active_tab=='slotcaps' %}show active{% endif %}" id="tab-slotcaps">
+    <div class="card mb-4">
+      <div class="card-header"><i class="bi bi-speedometer2"></i> Toplu Kapasite Ayarı</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('bulk_set_caps') }}?tab=slotcaps" class="row g-2 align-items-end">
+          <div class="col-md-3"><label class="form-label">Tüm Max Kapasite</label><input name="max_all" class="form-control" placeholder="Örn: 600"></div>
+          <div class="col-md-3"><label class="form-label">Tüm Min Kapasite</label><input name="min_all" class="form-control" placeholder="Örn: 0"></div>
+          <div class="col-md-3"><button class="btn btn-outline-secondary btn-action"><i class="bi bi-magic"></i> Toplu Uygula</button></div>
+        </form>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><i class="bi bi-table"></i> Slot Kapasite Matrisi</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('save_caps') }}?tab=slotcaps">
+          <div class="table-responsive">
+            <table class="table table-bordered table-sm align-middle">
+              <thead>
+                <tr class="table-light"><th>Gün \ Slot</th>
+                {% for s in range(1, cal.slots_per_day+1) %}<th class="text-center">S{{s}}</th>{% endfor %}</tr>
+              </thead>
+              <tbody>
+              {% for d in range(1, cal.n_days+1) %}
+                <tr>
+                  <th class="table-light">G{{d}}</th>
+                  {% for s in range(1, cal.slots_per_day+1) %}
+                    {% set cap = slot_caps.get((d,s)) %}
+                    <td>
+                      <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light" style="font-size:.7rem">min</span>
+                        <input name="min_{{d}}_{{s}}" value="{{cap.min}}" class="form-control" style="min-width:50px">
+                        <span class="input-group-text bg-light" style="font-size:.7rem">max</span>
+                        <input name="max_{{d}}_{{s}}" value="{{cap.max if cap.max < 10**9 else ''}}" class="form-control" style="min-width:50px">
+                      </div>
+                    </td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <button class="btn btn-primary btn-action mt-2"><i class="bi bi-check-lg"></i> Kaydet</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SEEDS TAB ===== -->
+  <div class="tab-pane {% if active_tab=='seeds' %}show active{% endif %}" id="tab-seeds">
+    <div class="row g-4">
+      <div class="col-lg-5">
+        <div class="card">
+          <div class="card-header"><i class="bi bi-pin-angle"></i> Tohum Atama Ekle</div>
+          <div class="card-body">
+            <form method="post" action="{{ url_for('add_seed') }}?tab=seeds" class="row g-2">
+              <div class="col-md-4"><input name="course" class="form-control" placeholder="Ders Kodu" list="allCoursesDL"></div>
+              <div class="col-md-3"><input name="day" type="number" class="form-control" placeholder="Gün"></div>
+              <div class="col-md-3"><input name="slot" type="number" class="form-control" placeholder="Slot"></div>
+              <div class="col-md-2 d-flex align-items-center">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" name="lock" id="lock"><label class="form-check-label" for="lock">Lock</label>
+                </div>
+              </div>
+              <div class="col-12"><button class="btn btn-primary btn-action"><i class="bi bi-plus-lg"></i> Ekle</button></div>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-7">
+        <div class="card">
+          <div class="card-header"><i class="bi bi-list-ul"></i> Tohum Atamaları</div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-modern mb-0">
+                <thead><tr><th>Ders</th><th>Gün</th><th>Slot</th><th>Lock</th><th></th></tr></thead>
+                <tbody>
+                {% for s in seeds %}
+                  <tr>
+                    <td><span class="chip">{{s.course}}</span></td>
+                    <td>G{{s.day}}</td>
+                    <td>S{{s.slot}}</td>
+                    <td>{% if s.lock %}<span class="badge bg-danger"><i class="bi bi-lock-fill"></i> Lock</span>{% else %}-{% endif %}</td>
+                    <td><a class="btn btn-sm btn-outline-danger" href="{{ url_for('del_seed', idx=loop.index0) }}?tab=seeds"><i class="bi bi-trash"></i></a></td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PREVIEW TAB ===== -->
+  <div class="tab-pane {% if active_tab=='preview' %}show active{% endif %}" id="tab-preview">
+    <div class="row g-3 mb-4">
+      {% set ns_preview = namespace(count=0) %}{% for code in preview.keys() if not code.endswith('__extra__') %}{% set ns_preview.count = ns_preview.count + 1 %}{% endfor %}
+      <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-success"><i class="bi bi-check-circle"></i></div><div><div class="stat-value">{{ ns_preview.count }}</div><div class="stat-label">Atanan Ders</div></div></div></div>
+      <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i></div><div><div class="stat-value">{{ preview_unassigned|length }}</div><div class="stat-label">Atanamayan</div></div></div></div>
+      <div class="col-md-6">
+        {% set total = ns_preview.count + preview_unassigned|length %}
+        {% set pct = (ns_preview.count / total * 100) if total > 0 else 0 %}
+        <div class="stat-card h-100 justify-content-center">
+          <div class="w-100">
+            <div class="d-flex justify-content-between mb-1"><span class="stat-label">Yerleştirme Oranı</span><span class="fw-bold">%{{ "%.1f"|format(pct) }}</span></div>
+            <div class="progress progress-sm"><div class="progress-bar bg-success" style="width: {{ pct }}%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-eye"></i> Hızlı Önizleme (Greedy)</span>
+        <form method="post" action="{{ url_for('run_preview') }}?tab=preview" class="m-0"><button class="btn btn-success btn-sm btn-action"><i class="bi bi-play-fill"></i> Çalıştır</button></form>
+      </div>
+    </div>
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="card">
+          <div class="card-header"><i class="bi bi-check-circle"></i> Atananlar</div>
+          <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+              <table class="table table-modern mb-0">
+                <thead><tr><th>Ders</th><th>Gün</th><th>Slot</th><th>Saat</th></tr></thead>
+                <tbody>
+                {% for code,(d,s) in preview.items() if not code.endswith('__extra__') %}
+                  {% set st,en = day_time(d,s) %}
+                  <tr><td><span class="chip">{{code}}</span></td><td>G{{d}}</td><td>S{{s}}</td><td><span class="chip chip-success">{{st}} - {{en}}</span></td></tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="card">
+          <div class="card-header"><i class="bi bi-exclamation-triangle"></i> Atanamayanlar & Alternatifler</div>
+          <div class="card-body">
+            {% if preview_unassigned %}
+              <div class="list-group list-group-flush">
+              {% for (code,reason,alts) in preview_unassigned %}
+                <div class="list-group-item px-0">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <span class="chip chip-danger">{{code}}</span> <small class="text-muted">{{reason}}</small>
+                      {% if preview_unassigned_conflicts and code in preview_unassigned_conflicts %}
+                        {% set conflicts = preview_unassigned_conflicts[code] %}
+                        {% if conflicts %}
+                          <div class="mt-1">
+                            <small class="text-muted">Çakışan:</small>
+                            {% for conflict_code in conflicts %}
+                              <span class="badge bg-danger bg-opacity-50">{{ conflict_code }}</span>
+                            {% endfor %}
+                          </div>
+                        {% endif %}
+                      {% endif %}
+                    </div>
+                  </div>
+                  {% if alts %}
+                    <div class="mt-1">
+                      <small class="text-muted">Öneriler:</small>
+                      {% for (d,s) in alts %}<span class="chip chip-warn">G{{d}}/S{{s}}</span>{% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+              </div>
+            {% else %}
+              <div class="text-center text-muted py-4"><i class="bi bi-check-circle-fill text-success fs-1"></i><p class="mt-2">Tüm dersler başarıyla yerleştirildi.</p></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SOLVE TAB ===== -->
+  <div class="tab-pane {% if active_tab=='solve' %}show active{% endif %}" id="tab-solve">
+    <div class="row g-3 mb-4">
+      {% set ns_final = namespace(count=0) %}{% for code in final.keys() if not code.endswith('__extra__') %}{% set ns_final.count = ns_final.count + 1 %}{% endfor %}
+      <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-success"><i class="bi bi-check-circle"></i></div><div><div class="stat-value">{{ ns_final.count }}</div><div class="stat-label">Atanan Ders</div></div></div></div>
+      <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i></div><div><div class="stat-value">{{ final_unassigned|length }}</div><div class="stat-label">Atanamayan</div></div></div></div>
+      <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-info"><i class="bi bi-cpu"></i></div><div><div class="stat-value">{{ 'Var' if has_ortools else 'Yok' }}</div><div class="stat-label">OR-Tools</div></div></div></div>
+      <div class="col-md-3">
+        {% set total_f = ns_final.count + final_unassigned|length %}
+        {% set pct_f = (ns_final.count / total_f * 100) if total_f > 0 else 0 %}
+        <div class="stat-card h-100 justify-content-center">
+          <div class="w-100">
+            <div class="d-flex justify-content-between mb-1"><span class="stat-label">Yerleştirme Oranı</span><span class="fw-bold">%{{ "%.1f"|format(pct_f) }}</span></div>
+            <div class="progress progress-sm"><div class="progress-bar bg-success" style="width: {{ pct_f }}%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if not has_ortools %}
+      <div class="alert alert-warning d-flex align-items-center gap-2"><i class="bi bi-exclamation-triangle-fill fs-4"></i><div>OR-Tools (cp-sat) yüklü değil. Terminalde <code>pip install ortools</code> komutunu çalıştırın.</div></div>
+    {% endif %}
+
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-cpu"></i> Kesin Yerleştir (CP-SAT)</span>
+        <form method="post" action="{{ url_for('run_solve') }}?tab=solve" class="row g-2 align-items-center m-0">
+          <div class="col-auto"><label class="form-label mb-0">Zaman Sınırı (sn)</label></div>
+          <div class="col-auto" style="width:80px"><input name="tl" class="form-control form-control-sm" value="20"></div>
+          <div class="col-auto"><button class="btn btn-danger btn-sm btn-action"><i class="bi bi-play-fill"></i> Çalıştır</button></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="card">
+          <div class="card-header d-flex justify-content-between">
+            <span><i class="bi bi-check-circle"></i> Atananlar</span>
+            <div>
+              <a class="btn btn-sm btn-outline-primary btn-action" href="{{ url_for('download_excel') }}"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+              <a class="btn btn-sm btn-outline-secondary btn-action" href="{{ url_for('download_ics') }}"><i class="bi bi-calendar-event"></i> ICS</a>
+            </div>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+              <table class="table table-modern mb-0">
+                <thead><tr><th>Ders</th><th>Gün</th><th>Slot</th><th>Saat</th></tr></thead>
+                <tbody>
+                {% for code,(d,s) in final.items() if not code.endswith('__extra__') %}
+                  {% set st,en = day_time(d,s) %}
+                  <tr><td><span class="chip">{{code}}</span></td><td>G{{d}}</td><td>S{{s}}</td><td><span class="chip chip-success">{{st}} - {{en}}</span></td></tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="card">
+          <div class="card-header"><i class="bi bi-exclamation-triangle"></i> Atanamayanlar</div>
+          <div class="card-body">
+            {% if final_unassigned %}
+              <div class="list-group list-group-flush">
+              {% for (code,reason,alts) in final_unassigned %}
+                <div class="list-group-item px-0">
+                  <div>
+                    <span class="chip chip-danger">{{code}}</span> <small class="text-muted">{{reason}}</small>
+                    {% if final_unassigned_conflicts and code in final_unassigned_conflicts %}
+                      {% set conflicts = final_unassigned_conflicts[code] %}
+                      {% if conflicts %}
+                        <div class="mt-1">
+                          <small class="text-muted">Çakışan:</small>
+                          {% for conflict_code in conflicts %}
+                            <span class="badge bg-danger bg-opacity-50">{{ conflict_code }}</span>
+                          {% endfor %}
+                        </div>
+                      {% endif %}
+                    {% endif %}
+                  </div>
+                  {% if alts %}
+                    <div class="mt-1">
+                      <small class="text-muted">Öneriler:</small>
+                      {% for (d,s) in alts %}<span class="chip chip-warn">G{{d}}/S{{s}}</span>{% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+              </div>
+            {% else %}
+              <div class="text-center text-muted py-4"><i class="bi bi-check-circle-fill text-success fs-1"></i><p class="mt-2">Tüm dersler başarıyla yerleştirildi.</p></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== KONTROL TAB ===== -->
+  <div class="tab-pane {% if active_tab=='kontrol' %}show active{% endif %}" id="tab-kontrol">
+    <h4 class="mb-3">Kontrol Sonuçları</h4>
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon bg-danger"><i class="bi bi-shuffle"></i></div>
+          <div><div class="stat-value">{{ kontrol_results.get('cakisma_ihlal', [])|length }}</div><div class="stat-label">Çakışma İhlali</div></div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon bg-warning text-dark"><i class="bi bi-calendar-x"></i></div>
+          <div><div class="stat-value">{{ kontrol_results.get('diffday_ihlal', [])|length }}</div><div class="stat-label">DiffDay İhlali</div></div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon bg-info"><i class="bi bi-clock-history"></i></div>
+          <div><div class="stat-value">{{ kontrol_results.get('diffslot_ihlal', [])|length }}</div><div class="stat-label">DiffSlot İhlali</div></div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="stat-card">
+          <div class="stat-icon bg-secondary"><i class="bi bi-exclamation-diamond"></i></div>
+          <div><div class="stat-value">{{ kontrol_results.get('degisecek_dersler', [])|length }}</div><div class="stat-label">Değişecek Ders</div></div>
+        </div>
+      </div>
+    </div>
+
+    {% if kontrol_results.get('cakisma_ihlal') %}
+    <div class="card mb-3">
+      <div class="card-header bg-danger text-white"><i class="bi bi-shuffle"></i> Çakışma İhlalleri</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-modern mb-0">
+            <thead><tr><th>Ders 1</th><th>Ders 2</th><th>Gün</th><th>Slot</th></tr></thead>
+            <tbody>
+              {% for ih in kontrol_results.cakisma_ihlal %}
+              <tr><td><span class="chip">{{ih.ders1}}</span></td><td><span class="chip">{{ih.ders2}}</span></td><td>G{{ih.gun}}</td><td>S{{ih.slot}}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if kontrol_results.get('diffday_ihlal') %}
+    <div class="card mb-3">
+      <div class="card-header bg-warning text-dark"><i class="bi bi-calendar-x"></i> Farklı Gün İhlalleri</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-modern mb-0">
+            <thead><tr><th>Ders 1</th><th>Ders 2</th><th>Gün</th><th>Slot 1</th><th>Slot 2</th></tr></thead>
+            <tbody>
+              {% for ih in kontrol_results.diffday_ihlal %}
+              <tr><td><span class="chip">{{ih.ders1}}</span></td><td><span class="chip">{{ih.ders2}}</span></td><td>G{{ih.gun}}</td><td>S{{ih.slot1}}</td><td>S{{ih.slot2}}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if kontrol_results.get('diffslot_ihlal') %}
+    <div class="card mb-3">
+      <div class="card-header bg-info text-white"><i class="bi bi-clock-history"></i> Farklı Slot İhlalleri (Aynı Gün+Aynı Slot)</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-modern mb-0">
+            <thead><tr><th>Ders 1</th><th>Ders 2</th><th>Gün</th><th>Slot</th></tr></thead>
+            <tbody>
+              {% for ih in kontrol_results.diffslot_ihlal %}
+              <tr><td><span class="chip">{{ih.ders1}}</span></td><td><span class="chip">{{ih.ders2}}</span></td><td>G{{ih.gun}}</td><td>S{{ih.slot}}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if kontrol_results.get('eksik_dersler') %}
+    <div class="card mb-3">
+      <div class="card-header bg-secondary text-white"><i class="bi bi-x-circle"></i> Eksik Dersler</div>
+      <div class="card-body">
+        {% for code in kontrol_results.eksik_dersler %}
+          <span class="chip chip-danger">{{code}}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="d-flex gap-2">
+      <form action="/run_kontrol" method="POST" class="m-0">
+        <button class="btn btn-primary btn-action"><i class="bi bi-play-fill"></i> Çalıştır</button>
+      </form>
+      <a href="?tab=degistir" class="btn btn-warning btn-action"><i class="bi bi-arrow-left-right"></i> Değişiklik Önerilerini Gör</a>
+    </div>
+  </div>
+
+  <!-- ===== DEGISTIR TAB ===== -->
+  <div class="tab-pane {% if active_tab=='degistir' %}show active{% endif %}" id="tab-degistir">
+    <h4 class="mb-3">Değiştirilecek Dersler</h4>
+    {% if degistir_onerileri %}
+    <form action="/apply_changes" method="POST">
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-modern mb-0">
+              <thead><tr><th>Seç</th><th>Ders</th><th>Eski Slot</th><th>Yeni Slot</th><th>Neden</th></tr></thead>
+              <tbody>
+                {% for oneri in degistir_onerileri %}
+                <tr>
+                  <td><input type="checkbox" name="changes" value="{{ oneri.code }}|{{ oneri.new_day }}|{{ oneri.new_slot_val }}" class="form-check-input"></td>
+                  <td><span class="chip">{{ oneri.code }}</span></td>
+                  <td>{{ oneri.old_slot }}</td>
+                  <td><span class="chip chip-success">{{ oneri.new_slot }}</span></td>
+                  <td>{{ oneri.neden }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-success btn-action mt-3"><i class="bi bi-check-lg"></i> Seçili Değişiklikleri Uygula</button>
+    </form>
+    {% else %}
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle"></i> Henüz değişiklik önerisi yok. Önce Kontrol sekmesinde analiz çalıştırın.
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ===== REPORTS TAB ===== -->
+  <div class="tab-pane {% if active_tab=='reports' %}show active{% endif %}" id="tab-reports">
+    <!-- Kontrol Özeti Kartı -->
+    <div class="card mb-4">
+      <div class="card-header"><i class="bi bi-shield-check"></i> Kontrol Özeti</div>
+      <div class="card-body">
+        {% if kontrol_results %}
+          <div class="row g-3">
+            <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-danger"><i class="bi bi-shuffle"></i></div><div><div class="stat-value">{{ kontrol_results.cakisma_ihlal|length }}</div><div class="stat-label">Çakışma İhlali</div></div></div></div>
+            <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-warning text-dark"><i class="bi bi-calendar-x"></i></div><div><div class="stat-value">{{ kontrol_results.diffday_ihlal|length }}</div><div class="stat-label">DiffDay İhlali</div></div></div></div>
+            <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-info"><i class="bi bi-clock-history"></i></div><div><div class="stat-value">{{ kontrol_results.diffslot_ihlal|length }}</div><div class="stat-label">DiffSlot İhlali</div></div></div></div>
+            <div class="col-md-3"><div class="stat-card"><div class="stat-icon bg-secondary"><i class="bi bi-exclamation-diamond"></i></div><div><div class="stat-value">{{ kontrol_results.degisecek_dersler|length }}</div><div class="stat-label">Değişecek Ders</div></div></div></div>
+          </div>
+        {% else %}
+          <p class="text-muted mb-0">Henüz kontrol çalıştırılmamış.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-4"><div class="stat-card"><div class="stat-icon {% if check_fixed_ok %}bg-success{% else %}bg-danger{% endif %}"><i class="bi bi-pin-angle"></i></div><div><div class="stat-value">{% if check_fixed_ok %}Tamam{% else %}İhlal{% endif %}</div><div class="stat-label">Sabit Atamalar</div></div></div></div>
+      <div class="col-md-4"><div class="stat-card"><div class="stat-icon {% if check_caps_ok %}bg-success{% else %}bg-danger{% endif %}"><i class="bi bi-speedometer2"></i></div><div><div class="stat-value">{% if check_caps_ok %}Tamam{% else %}İhlal{% endif %}</div><div class="stat-label">Kapasite Uyumu</div></div></div></div>
+      <div class="col-md-4"><div class="stat-card"><div class="stat-icon {% if check_groups_ok %}bg-success{% else %}bg-danger{% endif %}"><i class="bi bi-diagram-3"></i></div><div><div class="stat-value">{% if check_groups_ok %}Tamam{% else %}İhlal{% endif %}</div><div class="stat-label">Grup/Çakışma Uyumu</div></div></div></div>
+    </div>
+
+    {% if solve_notes %}
+    <div class="card border-warning mb-3">
+      <div class="card-header bg-warning text-dark"><i class="bi bi-info-circle"></i> Son Çözüm Notları</div>
+      <div class="card-body">
+        <ul class="list-group list-group-flush">
+          {% for note in solve_notes %}
+            <li class="list-group-item">{{ note }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if assignment_issues %}
+    <div class="card border-danger mb-3">
+      <div class="card-header bg-danger text-white"><i class="bi bi-exclamation-triangle-fill"></i> Yerleşim İhlalleri</div>
+      <div class="card-body p-0">
+        <div class="list-group list-group-flush">
+          {% for issue in assignment_issues %}
+            <div class="list-group-item">{{ issue }}</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if final_unassigned %}
+    <div class="card border-secondary mb-3">
+      <div class="card-header bg-secondary text-white"><i class="bi bi-x-circle"></i> Atanamayan Dersler</div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered mb-0">
+            <thead>
+              <tr><th>Ders</th><th>Neden</th><th>Çakışan Dersler</th><th>Alternatif Slotlar</th></tr>
+            </thead>
+            <tbody>
+              {% for code, reason, alts in final_unassigned %}
+                <tr>
+                  <td><strong>{{ code }}</strong></td>
+                  <td>{{ reason }}</td>
+                  <td>
+                    {% if final_unassigned_conflicts and code in final_unassigned_conflicts %}
+                      {% set conflicts = final_unassigned_conflicts[code] %}
+                      {% if conflicts %}
+                        {% for conflict_code in conflicts %}
+                          <span class="badge bg-danger">{{ conflict_code }}</span>
+                        {% endfor %}
+                      {% else %}
+                        <small class="text-muted">-</small>
+                      {% endif %}
+                    {% else %}
+                      <small class="text-muted">-</small>
+                    {% endif %}
+                  </td>
+                  <td>{% if alts %}{% for d,s in alts %}G{{d}}/S{{s}}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}-{% endif %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header"><i class="bi bi-grid-3x3"></i> Slot Doluluk Isı Haritası</div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-bordered table-sm align-middle">
+            <thead>
+              <tr class="table-light"><th>Gün \ Slot</th>
+              {% for s in range(1, cal.slots_per_day+1) %}<th class="text-center">S{{s}}</th>{% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+            {% for d in range(1, cal.n_days+1) %}
+              <tr>
+                <th class="table-light">G{{d}}</th>
+                {% for s in range(1, cal.slots_per_day+1) %}
+                  {% set color, load, capmax = heat_cell(d,s) %}
+                  <td><div class="heat-cell" style="background: {{color}}">{{load}}{% if capmax<10**9 %}<small>/{{capmax}}</small>{% endif %}</div></td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main-content -->
+
+<!-- Datalist for autocomplete -->
+<datalist id="allCoursesDL">
+  {% for code in courses.keys() %}<option value="{{code}}"></option>{% endfor %}
+</datalist>
+
+<!-- Floating Quick Actions -->
+<div class="fab-group">
+  <form method="post" action="{{ url_for('run_preview') }}?tab=preview" class="m-0">
+    <button class="btn btn-success fab-btn" title="Hızlı Önizleme"><i class="bi bi-eye"></i></button>
+  </form>
+  <form method="post" action="{{ url_for('run_solve') }}?tab=solve" class="m-0">
+    <button class="btn btn-danger fab-btn" title="Kesin Yerleştir"><i class="bi bi-cpu"></i></button>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Initialize toasts
+  document.querySelectorAll('.toast').forEach(t => new bootstrap.Toast(t).show());
+
+  // Mobile sidebar toggle
+  function toggleSidebar() {
+    const sb = document.getElementById('sidebar');
+    sb.classList.toggle('show');
+    document.getElementById('sidebarOverlay').style.opacity = sb.classList.contains('show') ? '0.5' : '0';
+    document.getElementById('sidebarOverlay').style.pointerEvents = sb.classList.contains('show') ? 'auto' : 'none';
+  }
+  document.getElementById('sidebarOverlay').addEventListener('click', toggleSidebar);
+
+  // Table filter
+  function filterTable(inputId, tableId) {
+    const filter = document.getElementById(inputId).value.toUpperCase();
+    const tr = document.getElementById(tableId).getElementsByTagName('tr');
+    for (let i = 0; i < tr.length; i++) {
+      const tds = tr[i].getElementsByTagName('td');
+      let show = false;
+      for (let j = 0; j < tds.length; j++) {
+        if (tds[j] && tds[j].textContent.toUpperCase().indexOf(filter) > -1) { show = true; break; }
+      }
+      tr[i].style.display = show ? '' : 'none';
+    }
+  }
+</script>
+</body>
+</html>
