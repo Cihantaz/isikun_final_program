@@ -1674,6 +1674,8 @@ def run_kontrol_analizi() -> Dict[str, Any]:
     degisecek_dersler = sorted(degisecek_set)
 
     oneriler: List[Dict[str, Any]] = []
+
+    # --- A) Yerlesen ama ihlal eden dersler icin oneri ---
     for code in degisecek_dersler:
         if code not in placed:
             continue
@@ -1726,6 +1728,60 @@ def run_kontrol_analizi() -> Dict[str, Any]:
                 "new_day": cd,
                 "new_slot_val": cs,
                 "neden": "Uygun alternatif bulunamadi",
+            })
+
+    # --- B) Yerlesemeyen dersler icin de oneri uret ---
+    for code in eksik_dersler:
+        cd = AppState.courses.get(code, {})
+        fd = to_int(cd.get("fixed_day"), 0)
+        fs = to_int(cd.get("fixed_slot"), 0)
+        forb = set(to_int(x, 0) for x in (cd.get("forbidden_days") or []))
+        pref_days = [to_int(x, 0) for x in (cd.get("preferred_days") or []) if 1 <= to_int(x, 0) <= n_days]
+
+        found = False
+        days_to_try = pref_days + [d for d in range(1, n_days + 1) if d not in pref_days]
+        for d in days_to_try:
+            if d in forb:
+                continue
+            for s in range(1, spd + 1):
+                if fd > 0 and d != fd:
+                    continue
+                if fs > 0 and s != fs:
+                    continue
+                ok = True
+                for other, (od, os) in placed.items():
+                    if (d, s) == (od, os):
+                        if (code, other) in conflict_pairs or (other, code) in conflict_pairs:
+                            ok = False
+                            break
+                        if (code, other) in diffslot_pairs or (other, code) in diffslot_pairs:
+                            ok = False
+                            break
+                    if d == od:
+                        if (code, other) in diffday_pairs or (other, code) in diffday_pairs:
+                            ok = False
+                            break
+                if ok:
+                    oneriler.append({
+                        "code": code,
+                        "old_slot": "YERLESEMEDI",
+                        "new_slot": f"G{d}/S{s}",
+                        "new_day": d,
+                        "new_slot_val": s,
+                        "neden": "Yerlesemeyen ders - onerilen slot",
+                    })
+                    found = True
+                    break
+            if found:
+                break
+        if not found:
+            oneriler.append({
+                "code": code,
+                "old_slot": "YERLESEMEDI",
+                "new_slot": "YOK",
+                "new_day": 0,
+                "new_slot_val": 0,
+                "neden": "Yerlesemeyen ders - hic uygun slot yok",
             })
 
     AppState.kontrol_results = {
@@ -2310,6 +2366,9 @@ def apply_changes():
             new_day = int(parts[1])
             new_slot = int(parts[2])
         except Exception:
+            continue
+        if new_day <= 0 or new_slot <= 0:
+            # Yerlesmeyen ders icin YOK onerisi secildiyse atla
             continue
         if code not in AppState.final and code not in AppState.preview:
             continue
