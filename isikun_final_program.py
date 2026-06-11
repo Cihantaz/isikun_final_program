@@ -47,6 +47,12 @@ except Exception:
 
 
 # =========================
+# Constants
+# =========================
+
+MAX_CAP = 10 ** 9  # Kapasite limiti için varsayılan "sonsuzluk" değeri
+
+# =========================
 # Type-safe helpers
 # =========================
 
@@ -59,16 +65,12 @@ def to_int(v: Any, default: int = 0) -> int:
             return default
         if isinstance(v, bool):
             return int(v)
-        if isinstance(v, int):
-            return v
-        if isinstance(v, float):
+        if isinstance(v, (int, float)):
             return int(v)
         s = str(v).strip()
         if s == "":
             return default
-        if re.fullmatch(r"[+-]?\d+(\.\d+)?", s):
-            return int(float(s))
-        return int(s)
+        return int(float(s))
     except Exception:
         return default
 
@@ -112,7 +114,7 @@ def norm_code(v: Any) -> str:
 
 
 def base_code(code: str) -> str:
-    return norm_code(code).replace("__EXTRA__", "").replace("__extra__", "")
+    return norm_code(code).replace("__EXTRA__", "")
 
 
 def parse_days(value: Any, n_days: int) -> List[int]:
@@ -204,7 +206,7 @@ class AppState:
     instructors: Dict[str, Dict[str, str]] = {}
     instructor_unavailability: List[Dict[str, Any]] = []
 
-    slot_caps: Dict[Tuple[int, int], Dict[str, int]] = defaultdict(lambda: {"min": 0, "max": 10**9})
+    slot_caps: Dict[Tuple[int, int], Dict[str, int]] = defaultdict(lambda: {"min": 0, "max": MAX_CAP})
     seeds: List[Dict[str, Any]] = []
 
     preview: Dict[str, Tuple[int, int]] = {}
@@ -229,7 +231,7 @@ def reset_all_state() -> None:
     AppState.group_constraints = []
     AppState.instructors = {}
     AppState.instructor_unavailability = []
-    AppState.slot_caps = defaultdict(lambda: {"min": 0, "max": 10**9})
+    AppState.slot_caps = defaultdict(lambda: {"min": 0, "max": MAX_CAP})
     AppState.seeds = []
     AppState.last_diagnostics = []
     AppState.kontrol_results = {}
@@ -303,9 +305,9 @@ def slot_caps_obj() -> Dict[Tuple[int, int], SimpleNamespace]:
     spd = to_int(AppState.calendar.get("slots_per_day"), 4)
     for d in range(1, n + 1):
         for s in range(1, spd + 1):
-            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": 10**9})
+            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
             mn = to_int(cap.get("min"), 0)
-            mx = to_int(cap.get("max"), 10**9)
+            mx = to_int(cap.get("max"), MAX_CAP)
             if mn > mx:
                 mn, mx = mx, mn
             out[(d, s)] = SimpleNamespace(min=mn, max=mx)
@@ -512,9 +514,9 @@ def greedy_preview() -> None:
                 if str(un.get("instr") or "") in instrs and to_int(un.get("day"), 0) == d and to_int(un.get("slot"), 0) == s:
                     return False, "Eğitmen"
 
-        cap = AppState.slot_caps.get((d, s), {"min": 0, "max": 10**9})
-        capmax = to_int(cap.get("max"), 10**9)
-        if capmax < 10**9 and slot_load[(d, s)] + size > capmax:
+        cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
+        capmax = to_int(cap.get("max"), MAX_CAP)
+        if capmax < MAX_CAP and slot_load[(d, s)] + size > capmax:
             return False, "Kapasite"
 
         for other, (od, os) in AppState.preview.items():
@@ -539,23 +541,22 @@ def greedy_preview() -> None:
         pref = [d for d in pref if 1 <= d <= n_days]
 
         candidates: List[Tuple[int, int]] = []
+        reason = "Uygun slot yok"
         days = pref + [d for d in range(1, n_days + 1) if d not in pref]
         for d in days:
             for s in range(1, spd + 1):
-                ok, _why = fits(code, d, s)
+                ok, why = fits(code, d, s)
                 if ok:
                     candidates.append((d, s))
+                elif why:
+                    reason = why
 
         placed = False
-        reason = "Uygun slot yok"
         for (d, s) in candidates:
-            ok, why = fits(code, d, s)
-            if ok:
-                AppState.preview[code] = (d, s)
-                slot_load[(d, s)] += size
-                placed = True
-                break
-            reason = why or reason
+            AppState.preview[code] = (d, s)
+            slot_load[(d, s)] += size
+            placed = True
+            break
 
         if not placed:
             alts = candidates[:3]
@@ -563,233 +564,28 @@ def greedy_preview() -> None:
 
 
 # =========================
-# Feasibility Doctor: grup kısıtları vs sabit slot çelişkileri
+# Helper: cached conflict / group pairs
 # =========================
 
-def diagnose_all_issues() -> List[str]:
-    """Tüm sistem verilerini tarar ve kullanıcıya gösterilecek uyarı/çelişki listesi döner.
-    15+ farklı senaryo tespit edilir."""
-    notes: List[str] = []
-    cal = AppState.calendar
-    n_days = to_int(cal.get("n_days"), 9)
-    spd = to_int(cal.get("slots_per_day"), 4)
-    slot_len = to_int(cal.get("slot_length_min"), 60)
-    last_forbidden = to_bool(cal.get("last_slot_forbidden_for_three_hour"))
-
-    # ============================================================
-    # 1. TAKVİM FİZİKSEL UYGUNLUK
-    # ============================================================
-    st = hhmm_to_time(str(cal.get("day_start_time") or "08:30")) or time(8, 30)
-    en = hhmm_to_time(str(cal.get("day_end_time") or "18:00")) or time(18, 0)
-    day_total_min = (en.hour * 60 + en.minute) - (st.hour * 60 + st.minute)
-    slots_total_min = spd * slot_len
-    if slots_total_min > day_total_min:
-        notes.append(
-            f"TAKVİM UYARISI: Gün başlangıç-bitiş aralığı {day_total_min} dk, "
-            f"ama {spd} slot × {slot_len} dk = {slots_total_min} dk gerekiyor. "
-            f"Slotlar güne sığmıyor."
-        )
-
-    # ============================================================
-    # 2. DERS SEVİYESİ UYARILAR
-    # ============================================================
-    all_instructor_ids = set(AppState.instructors.keys())
-    total_students = 0
-
-    for code, cd in AppState.courses.items():
-        ms = to_int(cd.get("multi_slots"), 1)
-        fd = to_int(cd.get("fixed_day"), 0)
-        fs = to_int(cd.get("fixed_slot"), 0)
-        pref = [to_int(x, 0) for x in (cd.get("preferred_days") or [])]
-        forb = [to_int(x, 0) for x in (cd.get("forbidden_days") or [])]
-        three = to_bool(cd.get("three_hour"))
-        size = to_int(cd.get("size"), 0)
-        total_students += size
-        instrs = [str(i).strip() for i in (cd.get("instructors") or []) if str(i).strip()]
-
-        # 2a. multi_slots > slots_per_day
-        if ms > spd:
-            notes.append(
-                f"{code}: multi_slots ({ms}) > gün başına slot ({spd}). Bu ders hiçbir güne sığmaz."
-            )
-
-        # 2b. fixed_slot + multi_slots exceeds day
-        if fs > 0 and fs + ms - 1 > spd:
-            notes.append(
-                f"{code}: Sabit slot S{fs} + multi_slots ({ms}) gün sonunu aşıyor (S{spd})."
-            )
-
-        # 2c. fixed_day in forbidden_days
-        if fd > 0 and fd in forb:
-            notes.append(
-                f"{code}: Sabit gün G{fd} aynı zamanda engelli günler listesinde."
-            )
-
-        # 2d. preferred ∩ forbidden
-        overlap = set(pref) & set(forb)
-        if overlap:
-            notes.append(
-                f"{code}: Gün {sorted(overlap)} hem tercih edilen hem engelli olarak tanımlanmış."
-            )
-
-        # 2e. Instructor ID not registered
-        for iid in instrs:
-            if iid not in all_instructor_ids:
-                notes.append(
-                    f"{code}: Eğitmen ID '{iid}' kayıtlı eğitmenlerde bulunamadı."
-                )
-
-        # 2f. three_hour + last slot forbidden + fixed to last slot
-        if three and last_forbidden and fs == spd and ms >= 1:
-            notes.append(
-                f"{code}: 3 saatlik sınav son slot (S{spd}) için sabitlenmiş, "
-                f"ancak takvim ayarında son slot 3 saatlik sınavlar için yasak."
-            )
-
-    # ============================================================
-    # 3. EĞİTMEN UYARILARI
-    # ============================================================
-    for rec in AppState.instructor_unavailability:
-        iid = str(rec.get("instr") or "").strip()
-        if iid and iid not in all_instructor_ids:
-            d = to_int(rec.get("day"), 0)
-            s = to_int(rec.get("slot"), 0)
-            notes.append(
-                f"Eğitmen uygun olmama kaydı (I={iid}, G{d}, S{s}): "
-                f"Bu ID kayıtlı eğitmenlerde yok."
-            )
-
-    # ============================================================
-    # 4. SEED UYARILARI
-    # ============================================================
-    for s in AppState.seeds:
-        c = norm_code(s.get("course"))
-        sd = to_int(s.get("day"), 0)
-        ssl = to_int(s.get("slot"), 0)
-        lock = to_bool(s.get("lock"))
-        if c not in AppState.courses:
-            notes.append(
-                f"Seed ({c} -> G{sd}/S{ssl}): Bu ders kodu kayıtlı derslerde yok."
-            )
-            continue
-        cd = AppState.courses[c]
-        fd = to_int(cd.get("fixed_day"), 0)
-        fs = to_int(cd.get("fixed_slot"), 0)
-        forb = [to_int(x, 0) for x in (cd.get("forbidden_days") or [])]
-
-        # 4a. Lock seed vs fixed slot conflict
-        if lock and fd > 0 and fs > 0 and (sd, ssl) != (fd, fs):
-            notes.append(
-                f"Seed çelişkisi: {c} dersi sabit G{fd}/S{fs} olarak tanımlı, "
-                f"ancak lock'lu seed G{sd}/S{ssl} konumunda. Seed sabit atamayı geçersiz kılar."
-            )
-
-        # 4b. Seed on forbidden day
-        if sd in forb:
-            notes.append(
-                f"Seed uyarısı: {c} -> G{sd}/S{ssl} engelli günlerden birine denk geliyor."
-            )
-
-        # 4c. Seed beyond calendar
-        if sd > n_days or ssl > spd:
-            notes.append(
-                f"Seed uyarısı: {c} -> G{sd}/S{ssl} takvim sınırlarını aşıyor."
-            )
-
-    # ============================================================
-    # 5. KAPASİTE UYARILARI
-    # ============================================================
-    total_capmax = 0
-    total_capmin = 0
-    max_single_cap = 0
-    for d in range(1, n_days + 1):
-        for s in range(1, spd + 1):
-            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": 10**9})
-            mn = to_int(cap.get("min"), 0)
-            mx = to_int(cap.get("max"), 10**9)
-            if mn > mx:
-                notes.append(
-                    f"Slot G{d}/S{s}: Min kapasite ({mn}) max kapasiteden ({mx}) büyük. "
-                    f"Sistem otomatik yer değiştirdi, lütfen düzeltin."
-                )
-            total_capmax += mx if mx < 10**9 else 0
-            total_capmin += mn
-            if mx < 10**9 and mx > max_single_cap:
-                max_single_cap = mx
-
-    # 5a. Total demand > total supply
-    if total_capmax > 0 and total_students > total_capmax:
-        notes.append(
-            f"KAPASİTE UYARISI: Toplam öğrenci sayısı ({total_students}) > "
-            f"toplam slot kapasitesi ({total_capmax}). Tüm dersler fiziksel olarak sığmaz."
-        )
-
-    # 5b. Total capmin > total students
-    if total_capmin > total_students:
-        notes.append(
-            f"KAPASİTE UYARISI: Toplam minimum kapasite ({total_capmin}) > "
-            f"toplam öğrenci sayısı ({total_students}). Min kapasiteler karşılanamaz."
-        )
-
-    # 5c. Any course larger than any single slot cap
-    if max_single_cap > 0:
-        for code, cd in AppState.courses.items():
-            sz = to_int(cd.get("size"), 0)
-            if sz > max_single_cap:
-                notes.append(
-                    f"{code}: Öğrenci sayısı ({sz}) tek slotun max kapasitesinden ({max_single_cap}) büyük. "
-                    f"Bu ders tek başına hiçbir slota sığmaz."
-                )
-
-    # ============================================================
-    # 6. ÇAKIŞMA / GRUP VERİ UYARILARI
-    # ============================================================
-    course_codes = set(AppState.courses.keys())
-
-    # 6a. Conflict references missing course
-    for a, b, w in AppState.conflicts:
-        a2, b2 = norm_code(a), norm_code(b)
-        # If either course is not in the system, ignore this conflict (it won't be scheduled)
-        if a2 not in course_codes or b2 not in course_codes:
-            continue
-        if a2 == b2:
-            notes.append(f"Çakışma kaydı ({a},{b}): Bir ders kendisiyle çakışamaz.")
-
-    # 6b. Group constraint references missing course
-    for g in AppState.group_constraints:
-        members = [norm_code(x) for x in (g.get("courses") or [])]
-        missing = [m for m in members if m and m not in course_codes]
-        if missing:
-            notes.append(
-                f"Grup kısıtı ({g.get('type')}): {', '.join(missing)} ders kodları sistemde yok."
-            )
-        # 6c. Duplicate codes in same group
-        seen = set()
-        dups = set()
-        for m in members:
-            if m in seen:
-                dups.add(m)
-            seen.add(m)
-        if dups:
-            notes.append(
-                f"Grup kısıtı ({g.get('type')}): {', '.join(dups)} tekrar eden ders kodu var."
-            )
-
-    # ============================================================
-    # 7. GRUP ÇELİŞKİLERİ (mevcut kodlar)
-    # ============================================================
-    conflict_pairs: set[Tuple[str, str]] = set()
+def get_conflict_pairs() -> set[Tuple[str, str]]:
+    """Sistemdeki çakışma çiftlerini normalize edilmiş şekilde döndürür."""
+    pairs: set[Tuple[str, str]] = set()
     for a, b, _w in AppState.conflicts:
         a2, b2 = norm_code(a), norm_code(b)
         if a2 and b2 and a2 != b2:
-            conflict_pairs.add((a2, b2))
-            conflict_pairs.add((b2, a2))
+            pairs.add((a2, b2))
+            pairs.add((b2, a2))
+    return pairs
 
-    same_day_pairs: set[Tuple[str, str]] = set()
-    diff_day_pairs: set[Tuple[str, str]] = set()
-    same_slot_pairs: set[Tuple[str, str]] = set()
-    diff_slot_pairs: set[Tuple[str, str]] = set()
 
+def get_group_pairs() -> Tuple[
+    set[Tuple[str, str]], set[Tuple[str, str]], set[Tuple[str, str]], set[Tuple[str, str]]
+]:
+    """Grup kısıtlarından (SameDay, DiffDay, SameSlot, DiffSlot) çiftleri döndürür."""
+    same_day: set[Tuple[str, str]] = set()
+    diff_day: set[Tuple[str, str]] = set()
+    same_slot: set[Tuple[str, str]] = set()
+    diff_slot: set[Tuple[str, str]] = set()
     for g in AppState.group_constraints:
         gtype = str(g.get("type") or "")
         members = [norm_code(x) for x in (g.get("courses") or [])]
@@ -801,49 +597,208 @@ def diagnose_all_issues() -> List[str]:
                 a, b = members[i], members[j]
                 key = (a, b) if a < b else (b, a)
                 if gtype == "SameDay":
-                    same_day_pairs.add(key)
+                    same_day.add(key)
                 elif gtype == "DifferentDay":
-                    diff_day_pairs.add(key)
+                    diff_day.add(key)
                 elif gtype == "SameSlot":
-                    same_slot_pairs.add(key)
+                    same_slot.add(key)
                 elif gtype == "DifferentSlot":
-                    diff_slot_pairs.add(key)
+                    diff_slot.add(key)
+    return same_day, diff_day, same_slot, diff_slot
 
-    # SameSlot + Çakışma duplicate
-    for a, b in same_slot_pairs:
+
+# =========================
+# Feasibility Doctor — alt kontrol fonksiyonları
+# =========================
+
+def _check_calendar_issues(notes: List[str], cal: Dict[str, Any]) -> None:
+    spd = to_int(cal.get("slots_per_day"), 4)
+    slot_len = to_int(cal.get("slot_length_min"), 60)
+    st = hhmm_to_time(str(cal.get("day_start_time") or "08:30")) or time(8, 30)
+    en = hhmm_to_time(str(cal.get("day_end_time") or "18:00")) or time(18, 0)
+    day_total_min = (en.hour * 60 + en.minute) - (st.hour * 60 + st.minute)
+    slots_total_min = spd * slot_len
+    if slots_total_min > day_total_min:
+        notes.append(
+            f"TAKVİM UYARISI: Gün başlangıç-bitiş aralığı {day_total_min} dk, "
+            f"ama {spd} slot × {slot_len} dk = {slots_total_min} dk gerekiyor. Slotlar güne sığmıyor."
+        )
+
+
+def _check_course_issues(
+    notes: List[str], courses: Dict[str, Dict[str, Any]],
+    n_days: int, spd: int, last_forbidden: bool, all_instr_ids: set[str]
+) -> int:
+    total_students = 0
+    for code, cd in courses.items():
+        ms = to_int(cd.get("multi_slots"), 1)
+        fd = to_int(cd.get("fixed_day"), 0)
+        fs = to_int(cd.get("fixed_slot"), 0)
+        pref = [to_int(x, 0) for x in (cd.get("preferred_days") or [])]
+        forb = [to_int(x, 0) for x in (cd.get("forbidden_days") or [])]
+        three = to_bool(cd.get("three_hour"))
+        size = to_int(cd.get("size"), 0)
+        total_students += size
+        instrs = [str(i).strip() for i in (cd.get("instructors") or []) if str(i).strip()]
+
+        if ms > spd:
+            notes.append(f"{code}: multi_slots ({ms}) > gün başına slot ({spd}). Bu ders hiçbir güne sığmaz.")
+        if fs > 0 and fs + ms - 1 > spd:
+            notes.append(f"{code}: Sabit slot S{fs} + multi_slots ({ms}) gün sonunu aşıyor (S{spd}).")
+        if fd > 0 and fd in forb:
+            notes.append(f"{code}: Sabit gün G{fd} aynı zamanda engelli günler listesinde.")
+        overlap = set(pref) & set(forb)
+        if overlap:
+            notes.append(f"{code}: Gün {sorted(overlap)} hem tercih edilen hem engelli olarak tanımlanmış.")
+        for iid in instrs:
+            if iid not in all_instr_ids:
+                notes.append(f"{code}: Eğitmen ID '{iid}' kayıtlı eğitmenlerde bulunamadı.")
+        if three and last_forbidden and fs == spd and ms >= 1:
+            notes.append(
+                f"{code}: 3 saatlik sınav son slot (S{spd}) için sabitlenmiş, "
+                f"ancak takvim ayarında son slot 3 saatlik sınavlar için yasak."
+            )
+    return total_students
+
+
+def _check_instructor_issues(notes: List[str], instructors: Dict[str, Any], unavailability: List[Dict[str, Any]]) -> None:
+    for rec in unavailability:
+        iid = str(rec.get("instr") or "").strip()
+        if iid and iid not in instructors:
+            d = to_int(rec.get("day"), 0)
+            s = to_int(rec.get("slot"), 0)
+            notes.append(f"Eğitmen uygun olmama kaydı (I={iid}, G{d}, S{s}): Bu ID kayıtlı eğitmenlerde yok.")
+
+
+def _check_seed_issues(notes: List[str], courses: Dict[str, Any], seeds: List[Dict[str, Any]], n_days: int, spd: int) -> None:
+    for s in seeds:
+        c = norm_code(s.get("course"))
+        sd = to_int(s.get("day"), 0)
+        ssl = to_int(s.get("slot"), 0)
+        lock = to_bool(s.get("lock"))
+        if c not in courses:
+            notes.append(f"Seed ({c} -> G{sd}/S{ssl}): Bu ders kodu kayıtlı derslerde yok.")
+            continue
+        cd = courses[c]
+        fd = to_int(cd.get("fixed_day"), 0)
+        fs = to_int(cd.get("fixed_slot"), 0)
+        forb = [to_int(x, 0) for x in (cd.get("forbidden_days") or [])]
+        if lock and fd > 0 and fs > 0 and (sd, ssl) != (fd, fs):
+            notes.append(
+                f"Seed çelişkisi: {c} dersi sabit G{fd}/S{fs} olarak tanımlı, "
+                f"ancak lock'lu seed G{sd}/S{ssl} konumunda. Seed sabit atamayı geçersiz kılar."
+            )
+        if sd in forb:
+            notes.append(f"Seed uyarısı: {c} -> G{sd}/S{ssl} engelli günlerden birine denk geliyor.")
+        if sd > n_days or ssl > spd:
+            notes.append(f"Seed uyarısı: {c} -> G{sd}/S{ssl} takvim sınırlarını aşıyor.")
+
+
+def _check_capacity_issues(
+    notes: List[str], slot_caps: Dict[Tuple[int, int], Dict[str, int]],
+    n_days: int, spd: int, courses: Dict[str, Any], total_students: int
+) -> None:
+    total_capmax = 0
+    total_capmin = 0
+    max_single_cap = 0
+    for d in range(1, n_days + 1):
+        for s in range(1, spd + 1):
+            cap = slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
+            mn = to_int(cap.get("min"), 0)
+            mx = to_int(cap.get("max"), MAX_CAP)
+            if mn > mx:
+                notes.append(
+                    f"Slot G{d}/S{s}: Min kapasite ({mn}) max kapasiteden ({mx}) büyük. "
+                    f"Sistem otomatik yer değiştirdi, lütfen düzeltin."
+                )
+            total_capmax += mx if mx < MAX_CAP else 0
+            total_capmin += mn
+            if mx < MAX_CAP and mx > max_single_cap:
+                max_single_cap = mx
+
+    if total_capmax > 0 and total_students > total_capmax:
+        notes.append(
+            f"KAPASİTE UYARISI: Toplam öğrenci sayısı ({total_students}) > "
+            f"toplam slot kapasitesi ({total_capmax}). Tüm dersler fiziksel olarak sığmaz."
+        )
+    if total_capmin > total_students:
+        notes.append(
+            f"KAPASİTE UYARISI: Toplam minimum kapasite ({total_capmin}) > "
+            f"toplam öğrenci sayısı ({total_students}). Min kapasiteler karşılanamaz."
+        )
+    if max_single_cap > 0:
+        for code, cd in courses.items():
+            sz = to_int(cd.get("size"), 0)
+            if sz > max_single_cap:
+                notes.append(
+                    f"{code}: Öğrenci sayısı ({sz}) tek slotun max kapasitesinden ({max_single_cap}) büyük. "
+                    f"Bu ders tek başına hiçbir slota sığmaz."
+                )
+
+
+def _check_conflict_data_issues(notes: List[str], conflicts: List[Tuple[str, str, int]], course_codes: set[str]) -> None:
+    for a, b, w in conflicts:
+        a2, b2 = norm_code(a), norm_code(b)
+        if a2 not in course_codes or b2 not in course_codes:
+            continue
+        if a2 == b2:
+            notes.append(f"Çakışma kaydı ({a},{b}): Bir ders kendisiyle çakışamaz.")
+
+
+def _check_group_data_issues(notes: List[str], group_constraints: List[Dict[str, Any]], course_codes: set[str]) -> None:
+    for g in group_constraints:
+        members = [norm_code(x) for x in (g.get("courses") or [])]
+        missing = [m for m in members if m and m not in course_codes]
+        if missing:
+            notes.append(f"Grup kısıtı ({g.get('type')}): {', '.join(missing)} ders kodları sistemde yok.")
+        seen = set()
+        dups = set()
+        for m in members:
+            if m in seen:
+                dups.add(m)
+            seen.add(m)
+        if dups:
+            notes.append(f"Grup kısıtı ({g.get('type')}): {', '.join(dups)} tekrar eden ders kodu var.")
+
+
+def _check_group_conflicts(
+    notes: List[str], group_constraints: List[Dict[str, Any]],
+    courses: Dict[str, Any], spd: int
+) -> None:
+    conflict_pairs = get_conflict_pairs()
+    same_day, diff_day, same_slot, diff_slot = get_group_pairs()
+
+    for a, b in same_slot:
         if (a, b) in conflict_pairs or (b, a) in conflict_pairs:
             notes.append(
                 f"UYARI: {a} ve {b} dersleri çakışma listesinde olduğu halde SameSlot grubuna da eklenmiş. "
                 f"Çakışma zaten aynı slotta olmalarını yasaklar. SameSlot grubu gereksizdir."
             )
 
-    # SameDay + DifferentDay conflict
-    for key in same_day_pairs & diff_day_pairs:
+    for key in same_day & diff_day:
         a, b = key
         notes.append(
             f"ÇELİŞKİ: {a} ve {b} dersleri için hem SameDay hem DifferentDay kısıtı tanımlanmış. "
             f"Aynı günde olmaları ve farklı günde olmaları aynı anda mümkün değil."
         )
 
-    # SameSlot + DifferentSlot conflict
-    for key in same_slot_pairs & diff_slot_pairs:
+    for key in same_slot & diff_slot:
         a, b = key
         notes.append(
             f"ÇELİŞKİ: {a} ve {b} dersleri için hem SameSlot hem DifferentSlot kısıtı tanımlanmış. "
             f"Aynı slotta olmaları ve farklı slotta olmaları aynı anda mümkün değil."
         )
 
-    # Fixed slot vs group constraints (original)
-    for g in AppState.group_constraints:
+    for g in group_constraints:
         gtype = str(g.get("type") or "")
         members = [norm_code(x) for x in (g.get("courses") or [])]
-        members = [m for m in members if m in AppState.courses]
+        members = [m for m in members if m in courses]
         if len(members) < 2:
             continue
 
         fixed_map: Dict[str, Tuple[int, int]] = {}
         for c in members:
-            cd = AppState.courses[c]
+            cd = courses[c]
             fd = to_int(cd.get("fixed_day"), 0)
             fs = to_int(cd.get("fixed_slot"), 0)
             if fd > 0 and fs > 0:
@@ -856,7 +811,6 @@ def diagnose_all_issues() -> List[str]:
                 notes.append(
                     f"SameSlot grubu çelişkisi: {details} — aynı slotta olmaları gerekirken farklı sabit slotlar verilmiş."
                 )
-
         elif gtype == "SameDay":
             days = {c: d for c, (d, _s) in fixed_map.items()}
             if len(set(days.values())) > 1:
@@ -864,7 +818,6 @@ def diagnose_all_issues() -> List[str]:
                 notes.append(
                     f"SameDay grubu çelişkisi: {details} — aynı günde olmaları gerekirken farklı sabit günler verilmiş."
                 )
-
         elif gtype == "DifferentSlot":
             seen_periods: Dict[int, List[str]] = defaultdict(list)
             for c, (d, s) in fixed_map.items():
@@ -873,9 +826,9 @@ def diagnose_all_issues() -> List[str]:
                 if len(codes) > 1:
                     d, s = period_to_day_slot(per, spd)
                     notes.append(
-                        f"DifferentSlot grubu çelişkisi: {', '.join(codes)} hepsi G{d}S{s} — farklı slotta olmaları gerekirken aynı sabit slota yerleştirilmiş."
+                        f"DifferentSlot grubu çelişkisi: {', '.join(codes)} hepsi G{d}S{s} — "
+                        f"farklı slotta olmaları gerekirken aynı sabit slota yerleştirilmiş."
                     )
-
         elif gtype == "DifferentDay":
             seen_days: Dict[int, List[str]] = defaultdict(list)
             for c, (d, _s) in fixed_map.items():
@@ -883,8 +836,31 @@ def diagnose_all_issues() -> List[str]:
             for d, codes in seen_days.items():
                 if len(codes) > 1:
                     notes.append(
-                        f"DifferentDay grubu çelişkisi: {', '.join(codes)} hepsi G{d} — farklı günde olmaları gerekirken aynı sabit güne yerleştirilmiş."
+                        f"DifferentDay grubu çelişkisi: {', '.join(codes)} hepsi G{d} — "
+                        f"farklı günde olmaları gerekirken aynı sabit güne yerleştirilmiş."
                     )
+
+
+def diagnose_all_issues() -> List[str]:
+    """Tüm sistem verilerini tarar ve kullanıcıya gösterilecek uyarı/çelişki listesi döner.
+    15+ farklı senaryo tespit edilir."""
+    notes: List[str] = []
+    cal = AppState.calendar
+    n_days = to_int(cal.get("n_days"), 9)
+    spd = to_int(cal.get("slots_per_day"), 4)
+    slot_len = to_int(cal.get("slot_length_min"), 60)
+    last_forbidden = to_bool(cal.get("last_slot_forbidden_for_three_hour"))
+
+    _check_calendar_issues(notes, cal)
+    total_students = _check_course_issues(notes, AppState.courses, n_days, spd, last_forbidden, set(AppState.instructors.keys()))
+    _check_instructor_issues(notes, AppState.instructors, AppState.instructor_unavailability)
+    _check_seed_issues(notes, AppState.courses, AppState.seeds, n_days, spd)
+    _check_capacity_issues(notes, AppState.slot_caps, n_days, spd, AppState.courses, total_students)
+
+    course_codes = set(AppState.courses.keys())
+    _check_conflict_data_issues(notes, AppState.conflicts, course_codes)
+    _check_group_data_issues(notes, AppState.group_constraints, course_codes)
+    _check_group_conflicts(notes, AppState.group_constraints, AppState.courses, spd)
 
     return notes
 
@@ -974,14 +950,14 @@ def analyze_assignment_issues(assign: Dict[str, Tuple[int, int]], slot_load: Dic
 
     # Slot capacity issues
     for (d, s), load in slot_load.items():
-        cap = AppState.slot_caps.get((d, s), {"min": 0, "max": 10**9})
+        cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
         capmin = to_int(cap.get("min"), 0)
-        capmax = to_int(cap.get("max"), 10**9)
+        capmax = to_int(cap.get("max"), MAX_CAP)
         if capmin > capmax:
             capmin, capmax = capmax, capmin
         if load < capmin:
             issues.append(f"G{d}/S{s}: Yük {load} < min kapasite {capmin}.")
-        if capmax < 10**9 and load > capmax:
+        if capmax < MAX_CAP and load > capmax:
             issues.append(f"G{d}/S{s}: Yük {load} > max kapasite {capmax}.")
 
     return issues
@@ -1263,9 +1239,9 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
     for d in range(1, n_days + 1):
         for s in range(1, spd + 1):
             p = period_index(d, s, spd)
-            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": 10**9})
-            capmax = to_int(cap.get("max"), 10**9)
-            if capmax < 10**9:
+            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
+            capmax = to_int(cap.get("max"), MAX_CAP)
+            if capmax < MAX_CAP:
                 # Sadece başlayanlar değil, o an AKTİF olan tüm derslerin kapasitesi toplanır
                 load_expr = LinearExpr.Sum([size_map[c] * active_expr[(c, p)] for c in courses])
                 model.Add(load_expr <= capmax)
@@ -1379,7 +1355,7 @@ def cpsat_solve(time_limit_sec: int = 20) -> Tuple[bool, str]:
     for d in range(1, n_days + 1):
         for s in range(1, spd + 1):
             p = period_index(d, s, spd)
-            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": 10**9})
+            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
             capmin = to_int(cap.get("min"), 0)
             if capmin <= 0:
                 continue
@@ -1832,10 +1808,10 @@ def index():
     def heat_cell(d: int, s: int) -> Tuple[str, int, int]:
         d = to_int(d, 0)
         s = to_int(s, 0)
-        cap = AppState.slot_caps.get((d, s), {"min": 0, "max": 10**9})
-        capmax = to_int(cap.get("max"), 10**9)
+        cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
+        capmax = to_int(cap.get("max"), MAX_CAP)
         load = to_int(slot_load.get((d, s), 0), 0)
-        denom = capmax if capmax < 10**9 else max(1, max(slot_load.values(), default=1))
+        denom = capmax if capmax < MAX_CAP else max(1, max(slot_load.values(), default=1))
         color = make_heat(load, denom)
         return color, load, capmax  # HTML expects this order
 
@@ -1855,9 +1831,9 @@ def index():
 
     check_caps_ok = True
     for (d, s), load in slot_load.items():
-        cap = AppState.slot_caps.get((d, s), {"min": 0, "max": 10**9})
+        cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
         capmin = to_int(cap.get("min"), 0)
-        capmax = to_int(cap.get("max"), 10**9)
+        capmax = to_int(cap.get("max"), MAX_CAP)
         if capmin > capmax:
             capmin, capmax = capmax, capmin
         if load < capmin or load > capmax:
@@ -1966,8 +1942,8 @@ def save_calendar():
     spd = to_int(c["slots_per_day"], 4)
     for d in range(1, n + 1):
         for s in range(1, spd + 1):
-            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": 10**9})
-            AppState.slot_caps[(d, s)] = {"min": to_int(cap.get("min"), 0), "max": to_int(cap.get("max"), 10**9)}
+            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
+            AppState.slot_caps[(d, s)] = {"min": to_int(cap.get("min"), 0), "max": to_int(cap.get("max"), MAX_CAP)}
 
     reset_results()
     flash("Takvim ayarları kaydedildi.", "success")
@@ -2120,7 +2096,7 @@ def add_conflict():
 
 @app.route("/update_conflict", methods=["POST"])
 def update_conflict():
-    idx = clamp_int(request.form.get("idx"), 0, 10**9)
+    idx = clamp_int(request.form.get("idx"), 0, MAX_CAP)
     if idx is None or idx < 0 or idx >= len(AppState.conflicts):
         flash("Çakışma bulunamadı.", "danger")
         return same_tab(request.args.get("tab", "conflicts"))
@@ -2200,7 +2176,7 @@ def add_group_constraint():
 
 @app.route("/del_group_constraint")
 def del_group_constraint():
-    idx = clamp_int(request.args.get("idx"), 0, 10**9)
+    idx = clamp_int(request.args.get("idx"), 0, MAX_CAP)
     if idx is not None and 0 <= idx < len(AppState.group_constraints):
         AppState.group_constraints.pop(idx)
         reset_results()
@@ -2233,8 +2209,8 @@ def del_instructor():
 @app.route("/add_unavailability", methods=["POST"])
 def add_unavailability():
     iid = str(request.form.get("instr") or "").strip()
-    day = clamp_int(request.form.get("day"), 1, 10**9)
-    slot = clamp_int(request.form.get("slot"), 1, 10**9)
+    day = clamp_int(request.form.get("day"), 1, MAX_CAP)
+    slot = clamp_int(request.form.get("slot"), 1, MAX_CAP)
     if not iid or not day or not slot:
         flash("Uygun olmama için ID/gün/slot giriniz.", "danger")
     else:
@@ -2246,7 +2222,7 @@ def add_unavailability():
 
 @app.route("/del_unavailability")
 def del_unavailability():
-    idx = clamp_int(request.args.get("idx"), 0, 10**9)
+    idx = clamp_int(request.args.get("idx"), 0, MAX_CAP)
     if idx is not None and 0 <= idx < len(AppState.instructor_unavailability):
         AppState.instructor_unavailability.pop(idx)
         reset_results()
@@ -2266,14 +2242,14 @@ def bulk_set_caps():
 
     for d in range(1, n + 1):
         for s in range(1, spd + 1):
-            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": 10**9})
+            cap = AppState.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
             if mm is not None:
                 cap["min"] = to_int(mm, 0)
             if mx is not None:
-                cap["max"] = to_int(mx, 10**9)
-            if to_int(cap["min"], 0) > to_int(cap["max"], 10**9):
+                cap["max"] = to_int(mx, MAX_CAP)
+            if to_int(cap["min"], 0) > to_int(cap["max"], MAX_CAP):
                 cap["min"], cap["max"] = cap["max"], cap["min"]
-            AppState.slot_caps[(d, s)] = {"min": to_int(cap["min"], 0), "max": to_int(cap["max"], 10**9)}
+            AppState.slot_caps[(d, s)] = {"min": to_int(cap["min"], 0), "max": to_int(cap["max"], MAX_CAP)}
 
     reset_results()
     flash("Toplu kapasite uygulandı.", "success")
@@ -2288,9 +2264,9 @@ def save_caps():
         for s in range(1, spd + 1):
             mn = to_opt_int(request.form.get(f"min_{d}_{s}"))
             mx_raw = request.form.get(f"max_{d}_{s}")
-            mx = to_opt_int(mx_raw) if mx_raw not in (None, "") else 10**9
+            mx = to_opt_int(mx_raw) if mx_raw not in (None, "") else MAX_CAP
             mn_i = to_int(mn, 0)
-            mx_i = to_int(mx, 10**9)
+            mx_i = to_int(mx, MAX_CAP)
             if mn_i > mx_i:
                 mn_i, mx_i = mx_i, mn_i
             AppState.slot_caps[(d, s)] = {"min": mn_i, "max": mx_i}
@@ -2302,8 +2278,8 @@ def save_caps():
 @app.route("/add_seed", methods=["POST"])
 def add_seed():
     c = norm_code(request.form.get("course"))
-    d = clamp_int(request.form.get("day"), 1, 10**9)
-    s = clamp_int(request.form.get("slot"), 1, 10**9)
+    d = clamp_int(request.form.get("day"), 1, MAX_CAP)
+    s = clamp_int(request.form.get("slot"), 1, MAX_CAP)
     lock = ("lock" in request.form)
     if not c or not d or not s:
         flash("Tohum için ders/gün/slot giriniz.", "danger")
@@ -2316,7 +2292,7 @@ def add_seed():
 
 @app.route("/del_seed")
 def del_seed():
-    idx = clamp_int(request.args.get("idx"), 0, 10**9)
+    idx = clamp_int(request.args.get("idx"), 0, MAX_CAP)
     if idx is not None and 0 <= idx < len(AppState.seeds):
         AppState.seeds.pop(idx)
         reset_results()
