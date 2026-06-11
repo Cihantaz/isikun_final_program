@@ -221,6 +221,8 @@ class AppState:
     last_diagnostics: List[str] = field(default_factory=list)
     kontrol_results: Dict[str, Any] = field(default_factory=dict)
     degistir_onerileri: List[Dict[str, Any]] = field(default_factory=list)
+    # Cache alanları (repr=False ile gizlenir)
+    _slot_caps_obj_cache: Optional[Dict[Tuple[int, int], SimpleNamespace]] = field(default=None, repr=False)
 
 
 appstate = AppState()
@@ -300,6 +302,8 @@ def group_constraints_obj() -> List[SimpleNamespace]:
 
 
 def slot_caps_obj() -> Dict[Tuple[int, int], SimpleNamespace]:
+    if appstate._slot_caps_obj_cache is not None:
+        return appstate._slot_caps_obj_cache
     out: Dict[Tuple[int, int], SimpleNamespace] = {}
     n = to_int(appstate.calendar.get("n_days"), 9)
     spd = to_int(appstate.calendar.get("slots_per_day"), 4)
@@ -311,6 +315,7 @@ def slot_caps_obj() -> Dict[Tuple[int, int], SimpleNamespace]:
             if mn > mx:
                 mn, mx = mx, mn
             out[(d, s)] = SimpleNamespace(min=mn, max=mx)
+    appstate._slot_caps_obj_cache = out
     return out
 
 
@@ -337,7 +342,6 @@ COURSE_COLS = {
     "sabit slot": "fixed_slot",
     "multi slots": "multi_slots",
     "3 saatlik": "three_hour",
-    "eğitmen id’leri": "instructor_ids",
     "eğitmen id'leri": "instructor_ids",
     "eğitmen idleri": "instructor_ids",
     "egitmen idleri": "instructor_ids",
@@ -737,12 +741,11 @@ def _check_capacity_issues(
 
 
 def _check_conflict_data_issues(notes: List[str], conflicts: List[Tuple[str, str, int]], course_codes: set[str]) -> None:
+    # load_conflicts_csv zaten a == b olanları eliyor; burada ek kontrol gerekmez
     for a, b, w in conflicts:
         a2, b2 = norm_code(a), norm_code(b)
         if a2 not in course_codes or b2 not in course_codes:
             continue
-        if a2 == b2:
-            notes.append(f"Çakışma kaydı ({a},{b}): Bir ders kendisiyle çakışamaz.")
 
 
 def _check_group_data_issues(notes: List[str], group_constraints: List[Dict[str, Any]], course_codes: set[str]) -> None:
@@ -867,9 +870,6 @@ def diagnose_all_issues() -> List[str]:
 
 def analyze_assignment_issues(assign: Dict[str, Tuple[int, int]], slot_load: Dict[Tuple[int, int], int]) -> List[str]:
     issues: List[str] = []
-    n_days = to_int(appstate.calendar.get("n_days"), 9)
-    spd = to_int(appstate.calendar.get("slots_per_day"), 4)
-
     placed = {base_code(k): (to_int(v[0], 0), to_int(v[1], 0)) for k, v in assign.items() if "__extra__" not in k}
 
     # Individual course assignment checks
@@ -1944,6 +1944,7 @@ def save_calendar():
         for s in range(1, spd + 1):
             cap = appstate.slot_caps.get((d, s), {"min": 0, "max": MAX_CAP})
             appstate.slot_caps[(d, s)] = {"min": to_int(cap.get("min"), 0), "max": to_int(cap.get("max"), MAX_CAP)}
+            appstate._slot_caps_obj_cache = None
 
     reset_results()
     flash("Takvim ayarları kaydedildi.", "success")
@@ -2250,6 +2251,7 @@ def bulk_set_caps():
             if to_int(cap["min"], 0) > to_int(cap["max"], MAX_CAP):
                 cap["min"], cap["max"] = cap["max"], cap["min"]
             appstate.slot_caps[(d, s)] = {"min": to_int(cap["min"], 0), "max": to_int(cap["max"], MAX_CAP)}
+            appstate._slot_caps_obj_cache = None
 
     reset_results()
     flash("Toplu kapasite uygulandı.", "success")
@@ -2270,6 +2272,7 @@ def save_caps():
             if mn_i > mx_i:
                 mn_i, mx_i = mx_i, mn_i
             appstate.slot_caps[(d, s)] = {"min": mn_i, "max": mx_i}
+            appstate._slot_caps_obj_cache = None
     reset_results()
     flash("Kapasiteler kaydedildi.", "success")
     return same_tab(request.args.get("tab", "slotcaps"))
